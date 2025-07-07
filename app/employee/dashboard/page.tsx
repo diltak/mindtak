@@ -330,7 +330,7 @@ export default function EmployeeDashboard() {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-300 flex items-center justify-center text-gray-500">
+                <div className="h-[300px] flex items-center justify-center text-gray-500">
                   <div className="text-center">
                     <Brain className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p>No reports yet. Create your first wellness check to see trends.</p>
