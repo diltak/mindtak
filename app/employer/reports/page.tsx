@@ -24,12 +24,15 @@ import {
 import { useUser } from '@/hooks/use-user';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { MentalHealthReport, User } from '@/types';
+
 interface ReportWithEmployee extends MentalHealthReport {
-  employee?: UserType;
+  employee?: User;
 }
 
 export default function EmployerReportsPage() {
   const { user, loading: userLoading } = useUser();
+  const router = useRouter();
   const [reports, setReports] = useState<ReportWithEmployee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,7 +71,7 @@ export default function EmployerReportsPage() {
         where('role', '==', 'employee')
       );
       const employeesSnapshot = await getDocs(employeesQuery);
-      const employees = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as UserType[];
+      const employees = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as User[];
 
       const employeeIds = employees?.map(emp => emp.id) || [];
 
