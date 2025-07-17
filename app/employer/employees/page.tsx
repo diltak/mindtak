@@ -10,10 +10,10 @@ import { Badge } from '@/components/ui/badge'; // Keep this import
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  Users, 
+import {
+  Users,
   UserPlus,
-  Search, 
+  Search,
   Filter,
   Mail,
   Calendar,
@@ -26,8 +26,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { collection, query, where, getDocs, orderBy, DocumentSnapshot, DocumentData } from 'firebase/firestore';
-import type { User as UserType, MentalHealthReport as MentalHealthReportType, Company } from '@/types';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import type { User as UserType, MentalHealthReport as MentalHealthReportType } from '@/types';
 import { useUser } from '@/hooks/use-user';
 import { db } from '@/lib/firebase'; // Import db from Firebase
 // import { DocumentSnapshot, DocumentData } from 'firebase/firestore';
@@ -70,16 +70,16 @@ export default function EmployeesPage() {
       const employeesRef = collection(db, 'users');
       const employeesQuery = query(
         employeesRef,
-        where('company_id', '==', (user as UserType & { company_id: string }).company_id), // Cast user to ensure company_id is present
-        where('role', '==', 'employee'),
-        orderBy('createdAt', 'desc') // Assuming you have a 'createdAt' field in Firestore
+        where('company_id', '==', (user as UserType & { company_id: string }).company_id),
+        where('role', '==', 'employee')
+        // Removed orderBy to avoid index requirements - will sort in JavaScript
       );
 
       const employeeSnapshot = await getDocs(employeesQuery);
 
       const employeesData: UserType[] = employeeSnapshot.docs.map(doc => ({
- ...doc.data() as UserType,
- id: doc.id, // Explicitly assign id from doc.id
+        ...doc.data() as UserType,
+        id: doc.id, // Explicitly assign id from doc.id
       }));
 
       if (!employeesData) {
@@ -89,35 +89,51 @@ export default function EmployeesPage() {
 
       // Fetch reports for each employee
       const employeesWithStats: EmployeeWithStats[] = [];
-      
+
       const reportPromises = employeesData.map(async (employee) => {
-        const reportsRef = collection(db, 'mentalHealthReports'); // Assuming 'mentalHealthReports' collection
+        const reportsRef = collection(db, 'mental_health_reports');
         const reportsQuery = query(
           reportsRef,
-          where('employeeId', '==', employee.id), // Assuming 'employeeId' field
-          orderBy('createdAt', 'desc') // Assuming 'createdAt' field
+          where('employee_id', '==', employee.id) // Fixed field name
+          // Removed orderBy to avoid index requirements - will sort in JavaScript
         );
 
-        const reportSnapshot = await getDocs(reportsQuery);
-        
-        const reports: MentalHealthReportType[] = reportSnapshot.docs.map(doc => ({
- ...doc.data() as MentalHealthReportType,
- id: doc.id,
-        }));
+        try {
+          const reportSnapshot = await getDocs(reportsQuery);
 
-        const reportsCount = reports.length || 0;
-        const averageWellness = reportsCount > 0 
-          ? Math.round(reports.reduce((sum: number, report: MentalHealthReportType) => sum + report.overall_wellness, 0) / reportsCount)
-          : 0; // Explicitly type sum and report parameters
+          const reports: MentalHealthReportType[] = reportSnapshot.docs.map(doc => ({
+            ...doc.data() as MentalHealthReportType,
+            id: doc.id,
+          }));
 
+          // Sort reports by created_at in JavaScript (newest first)
+          const sortedReports = reports.sort((a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
 
-        employeesWithStats.push({
-          ...employee,
-          latest_report: reports?.[0],
-          reports_count: reportsCount,
-          average_wellness: averageWellness,
-          last_report_date: reports?.[0]?.created_at,
-        });
+          const reportsCount = sortedReports.length || 0;
+          const averageWellness = reportsCount > 0
+            ? Math.round(sortedReports.reduce((sum: number, report: MentalHealthReportType) => sum + report.overall_wellness, 0) / reportsCount)
+            : 0;
+
+          employeesWithStats.push({
+            ...employee,
+            latest_report: sortedReports?.[0], // Get the most recent report
+            reports_count: reportsCount,
+            average_wellness: averageWellness,
+            last_report_date: sortedReports?.[0]?.created_at,
+          });
+        } catch (error) {
+          console.error(`Error fetching reports for employee ${employee.id}:`, error);
+          // Add employee with no report data
+          employeesWithStats.push({
+            ...employee,
+            latest_report: undefined,
+            reports_count: 0,
+            average_wellness: 0,
+            last_report_date: undefined,
+          });
+        }
       });
 
       // Wait for all report fetches to complete
@@ -135,7 +151,7 @@ export default function EmployeesPage() {
 
   const getRiskLevelBadge = (riskLevel?: 'low' | 'medium' | 'high') => {
     if (!riskLevel) return <Badge className="bg-gray-100 text-gray-700">No Data</Badge>;
-    
+
     const colors = {
       low: 'bg-green-100 text-green-700 border-green-200',
       medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -161,14 +177,14 @@ export default function EmployeesPage() {
   const departments = Array.from(new Set(employees.map(emp => emp.department).filter(Boolean)));
 
   const filteredEmployees = employees.filter(employee => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       `${employee.first_name} ${employee.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employee.department?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesDepartment = filterDepartment === 'all' || employee.department === filterDepartment;
     const matchesRisk = filterRisk === 'all' || employee.latest_report?.risk_level === filterRisk;
-    
+
     return matchesSearch && matchesDepartment && matchesRisk;
   });
 
@@ -189,7 +205,7 @@ export default function EmployeesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar user={user} />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
@@ -277,7 +293,7 @@ export default function EmployeesPage() {
                   className="pl-10"
                 />
               </div>
-              
+
               <Select value={filterDepartment} onValueChange={setFilterDepartment}>
                 <SelectTrigger>
                   <Filter className="h-4 w-4 mr-2" />
@@ -336,7 +352,7 @@ export default function EmployeesPage() {
                         )}
                       </div>
                     </div>
-                    
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -383,7 +399,7 @@ export default function EmployeesPage() {
                       <span className="text-sm text-gray-600">Risk Level:</span>
                       {getRiskLevelBadge(employee.latest_report?.risk_level)}
                     </div>
-                    
+
                     {employee.last_report_date && (
                       <div className="flex items-center space-x-1 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
@@ -435,7 +451,7 @@ export default function EmployeesPage() {
               <Users className="h-16 w-16 mx-auto mb-4 text-gray-300" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Employees Found</h3>
               <p className="text-gray-600 mb-6">
-                {searchTerm || filterDepartment !== 'all' || filterRisk !== 'all' 
+                {searchTerm || filterDepartment !== 'all' || filterRisk !== 'all'
                   ? 'No employees match your current filters. Try adjusting your search criteria.'
                   : 'You haven\'t added any employees yet. Start building your team!'
                 }

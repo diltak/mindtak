@@ -23,15 +23,20 @@ export async function POST(request: NextRequest) {
     const reportsQuery = query(
       collection(db, 'mental_health_reports'),
       where('company_id', '==', company_id),
-      where('created_at', '>=', startDate.toISOString()),
-      orderBy('created_at', 'desc')
+      where('created_at', '>=', startDate.toISOString())
+      // Removed orderBy to avoid index requirements - will sort in JavaScript
     );
 
     const reportsSnapshot = await getDocs(reportsQuery);
-    const reports: MentalHealthReport[] = reportsSnapshot.docs.map(doc => ({
+    const reportsData: MentalHealthReport[] = reportsSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data() as Omit<MentalHealthReport, 'id'>
     }));
+
+    // Sort reports by created_at in JavaScript (newest first)
+    const reports = reportsData.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
 
     // Generate CSV content
     const csvHeaders = [

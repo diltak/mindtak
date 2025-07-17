@@ -19,11 +19,11 @@ import { toast } from 'sonner';
 export default function NewEmployeePage() {
   const { user } = useUser();
   const router = useRouter();
-  
+
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
@@ -57,10 +57,10 @@ export default function NewEmployeePage() {
     for (let i = 0; i < 12; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       password: password,
-      confirmPassword: password 
+      confirmPassword: password
     }));
   };
 
@@ -103,20 +103,20 @@ export default function NewEmployeePage() {
         // Create user profile
         const userDocRef = doc(collection(db, 'users'), firebaseUser.uid); // Assuming db is imported from '@/lib/firebase'
         await setDoc(userDocRef, {
-            id: firebaseUser.uid, // Use Firebase Auth UID as document ID and id field
-            email: formData.email,
-            role: 'employee',
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            department: formData.department || '',
-            company_id: user.company_id,
-          });
+          id: firebaseUser.uid, // Use Firebase Auth UID as document ID and id field
+          email: formData.email,
+          role: 'employee',
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          department: formData.department || '',
+          company_id: user.company_id,
+        });
 
         toast.success('Employee added successfully!');
         router.push('/employer/employees');
-      }  else {
-          setError('Failed to create employee profile');
-        }
+      } else {
+        setError('Failed to create employee profile');
+      }
     } catch (err) {
       setError('An unexpected error occurred');
       console.error('Error:', err);
@@ -154,7 +154,7 @@ export default function NewEmployeePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar user={user} />
-      
+
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -189,7 +189,7 @@ export default function NewEmployeePage() {
                   <User className="h-5 w-5" />
                   <span>Personal Information</span>
                 </h3>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name *</Label>
@@ -236,7 +236,7 @@ export default function NewEmployeePage() {
                   <Building className="h-5 w-5" />
                   <span>Work Information</span>
                 </h3>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="department">Department</Label>
                   <Select value={formData.department} onValueChange={(value) => handleInputChange('department', value)}>
@@ -265,7 +265,7 @@ export default function NewEmployeePage() {
                     Generate Password
                   </Button>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="password">Password *</Label>
@@ -278,7 +278,7 @@ export default function NewEmployeePage() {
                       required
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password *</Label>
                     <Input

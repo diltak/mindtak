@@ -17,46 +17,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-
-    // Convert the File to a format OpenAI can process
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    
-    // Create a File-like object that OpenAI expects
-    const file = new File([buffer], 'audio.webm', { type: 'audio/webm' });
-
-    // Use OpenAI Whisper to transcribe the audio
+    // Convert the file to the format expected by OpenAI
     const transcription = await openai.audio.transcriptions.create({
-      file: file,
+      file: audioFile,
       model: 'whisper-1',
       language: 'en',
       response_format: 'json',
-      temperature: 0.2,
     });
 
     return NextResponse.json({
-      text: transcription.text,
-      success: true
+      text: transcription.text
     });
 
   } catch (error: any) {
     console.error('Transcription error:', error);
-    
-    // Handle specific OpenAI errors
-    if (error.code === 'invalid_api_key') {
-      return NextResponse.json(
-        { error: 'Invalid OpenAI API key' },
-        { status: 401 }
-      );
-    }
-    
-    if (error.code === 'model_not_found') {
-      return NextResponse.json(
-        { error: 'Whisper model not available' },
-        { status: 503 }
-      );
-    }
-
     return NextResponse.json(
       { error: 'Failed to transcribe audio', details: error.message },
       { status: 500 }

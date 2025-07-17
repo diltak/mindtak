@@ -11,18 +11,18 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 
-import { 
-  Send, 
-  Bot, 
-  User, 
-  PhoneOff, 
-  Loader2, 
-  FileText, 
-  Sparkles, 
-  Phone, 
-  Mic, 
-  MicOff, 
-  Volume2, 
+import {
+  Send,
+  Bot,
+  User,
+  PhoneOff,
+  Loader2,
+  FileText,
+  Sparkles,
+  Phone,
+  Mic,
+  MicOff,
+  Volume2,
   VolumeX,
   Square,
   Play,
@@ -55,7 +55,7 @@ class AudioRecorder {
 
   async startRecording(): Promise<boolean> {
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ 
+      this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -132,6 +132,25 @@ interface WellnessReport {
   recommendations: string[];
 }
 
+// Helper function to calculate risk level based on report data
+const calculateRiskLevel = (report: WellnessReport): 'low' | 'medium' | 'high' => {
+  const riskFactors = [
+    report.stress_score >= 8 ? 2 : report.stress_score >= 6 ? 1 : 0,
+    report.anxious_level >= 8 ? 2 : report.anxious_level >= 6 ? 1 : 0,
+    report.mood <= 3 ? 2 : report.mood <= 5 ? 1 : 0,
+    report.energy_level <= 3 ? 1 : 0,
+    report.work_satisfaction <= 3 ? 1 : 0,
+    report.sleep_quality <= 3 ? 1 : 0,
+    report.confident_level <= 3 ? 1 : 0
+  ];
+
+  const totalRisk = riskFactors.reduce((sum, factor) => sum + factor, 0);
+
+  if (totalRisk >= 6) return 'high';
+  if (totalRisk >= 3) return 'medium';
+  return 'low';
+};
+
 export default function EmployeeChatPage() {
   const { user, loading: userLoading } = useUser();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -141,7 +160,7 @@ export default function EmployeeChatPage() {
   const [sessionEnded, setSessionEnded] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<WellnessReport | null>(null);
 
-  
+
   // Voice/Call state
   const [isVoiceMode, setIsVoiceMode] = useState(false);
 
@@ -155,7 +174,7 @@ export default function EmployeeChatPage() {
 
 
   const [processingAudio, setProcessingAudio] = useState(false);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -397,7 +416,7 @@ export default function EmployeeChatPage() {
         callTimerRef.current = null;
       }
     }
-    
+
     return () => {
       if (callTimerRef.current) {
         clearInterval(callTimerRef.current);
@@ -414,10 +433,10 @@ export default function EmployeeChatPage() {
   // Text to speech function
   const speakText = (text: string) => {
     if (!audioEnabled || !('speechSynthesis' in window)) return;
-    
+
     // Stop any current speech
     window.speechSynthesis.cancel();
-    
+
 
 
 
@@ -431,7 +450,7 @@ export default function EmployeeChatPage() {
 
 
     utterance.volume = 1;
-    
+
 
 
 
@@ -448,7 +467,7 @@ export default function EmployeeChatPage() {
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-    
+
 
 
 
@@ -511,7 +530,7 @@ export default function EmployeeChatPage() {
   const stopRecording = async () => {
     setIsRecording(false);
     setProcessingAudio(true);
-    
+
 
 
 
@@ -520,13 +539,13 @@ export default function EmployeeChatPage() {
 
 
     const audioBlob = await audioRecorderRef.current.stopRecording();
-    
+
     if (audioBlob) {
       await processAudioMessage(audioBlob);
     } else {
       toast.error('Failed to process audio recording');
     }
-    
+
     setProcessingAudio(false);
   };
 
@@ -545,7 +564,7 @@ export default function EmployeeChatPage() {
       // Convert audio to text using Whisper API
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
-      
+
       const transcriptionResponse = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData,
@@ -566,7 +585,7 @@ export default function EmployeeChatPage() {
 
 
       const { text } = await transcriptionResponse.json();
-      
+
 
 
 
@@ -607,12 +626,12 @@ export default function EmployeeChatPage() {
     setIsRecording(false);
     setIsSpeaking(false);
     setProcessingAudio(false);
-    
+
     // Stop any ongoing speech
     if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
-    
+
 
 
 
@@ -673,7 +692,7 @@ export default function EmployeeChatPage() {
       // Set up real-time listener for messages
 
       const messagesQuery = query(
-        collection(db, 'chat_sessions', newSessionDoc.id, 'messages'), 
+        collection(db, 'chat_sessions', newSessionDoc.id, 'messages'),
         orderBy('timestamp')
       );
 
@@ -735,12 +754,12 @@ export default function EmployeeChatPage() {
 
     try {
       // Note: we fetch the latest messages from state to ensure the API gets the full context
-      const messageHistoryForApi = [...messages, { 
-        id: 'temp', 
+      const messageHistoryForApi = [...messages, {
+        id: 'temp',
         session_id: sessionId,
-        sender: 'user', 
-        content: messageContent, 
-        timestamp: new Date().toISOString() 
+        sender: 'user',
+        content: messageContent,
+        timestamp: new Date().toISOString()
       }];
 
 
@@ -750,7 +769,7 @@ export default function EmployeeChatPage() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           messages: messageHistoryForApi,
 
 
@@ -787,7 +806,7 @@ export default function EmployeeChatPage() {
   };
 
   const handleEndSession = async () => {
-    if (!sessionId || loading || sessionEnded) return;
+    if (!sessionId || loading || sessionEnded || !user) return;
 
     toast.info('Generating your wellness report...');
     setLoading(true);
@@ -808,8 +827,8 @@ export default function EmployeeChatPage() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messages, 
+        body: JSON.stringify({
+          messages,
           endSession: true,
           sessionType: isVoiceMode ? 'voice' : 'text',
           sessionDuration: callDuration || Math.floor((Date.now() - (callStartTime?.getTime() || Date.now())) / 1000)
@@ -844,26 +863,63 @@ export default function EmployeeChatPage() {
 
       if (result.type === 'report') {
         const report = result.data as WellnessReport;
+        const sessionDuration = callDuration || Math.floor((Date.now() - (callStartTime?.getTime() || Date.now())) / 1000);
+
+        // Update the chat session
         const sessionDocRef = doc(db, 'chat_sessions', sessionId);
         await updateDoc(sessionDocRef, {
           report: report,
           status: 'completed',
           completed_at: serverTimestamp(),
           session_type: isVoiceMode ? 'voice' : 'text',
-          duration: callDuration || Math.floor((Date.now() - (callStartTime?.getTime() || Date.now())) / 1000)
+          duration: sessionDuration
         });
+
+        // Save the report to the mental_health_reports collection
+        const mentalHealthReport = {
+          employee_id: user.id,
+          company_id: user.company_id || 'default',
+          stress_level: Math.max(1, Math.min(10, Math.round(report.stress_score))),
+          mood_rating: Math.max(1, Math.min(10, Math.round(report.mood))),
+          energy_level: Math.max(1, Math.min(10, Math.round(report.energy_level))),
+          work_satisfaction: Math.max(1, Math.min(10, Math.round(report.work_satisfaction))),
+          work_life_balance: Math.max(1, Math.min(10, Math.round(report.work_life_balance))),
+          anxiety_level: Math.max(1, Math.min(10, Math.round(report.anxious_level))),
+          confidence_level: Math.max(1, Math.min(10, Math.round(report.confident_level))),
+          sleep_quality: Math.max(1, Math.min(10, Math.round(report.sleep_quality))),
+          overall_wellness: Math.max(1, Math.min(10, Math.round((report.mood + report.energy_level + report.work_satisfaction + report.work_life_balance + report.confident_level + report.sleep_quality + (11 - report.stress_score) + (11 - report.anxious_level)) / 8))),
+          comments: `AI-generated report from ${isVoiceMode ? 'voice' : 'text'} session`,
+          ai_analysis: report.complete_report || 'Report generated successfully',
+          sentiment_score: Math.max(0, Math.min(1, report.mood / 10)),
+          emotion_tags: Array.isArray(report.key_insights) ? report.key_insights : [],
+          risk_level: calculateRiskLevel(report),
+          session_type: isVoiceMode ? 'voice' : 'text',
+          session_duration: sessionDuration,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        try {
+          await addDoc(collection(db, 'mental_health_reports'), mentalHealthReport);
+          console.log('Mental health report saved successfully');
+        } catch (saveError) {
+          console.error('Error saving mental health report:', saveError);
+          // Don't throw here - we still want to show the report to the user
+          toast.error('Report generated but failed to save. Please contact support.');
+        }
+
         setGeneratedReport(report);
         setSessionEnded(true);
-        toast.success('Wellness report generated successfully!');
+        toast.success('Wellness report generated and saved successfully!');
       } else {
         throw new Error('AI did not return a valid report format.');
       }
 
     } catch (error) {
-        console.error('Error ending session and generating report:', error);
-        toast.error('Could not generate your report. Please try again later.');
+      console.error('Error ending session and generating report:', error);
+      toast.error('Could not generate your report. Please try again later.');
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -896,13 +952,13 @@ export default function EmployeeChatPage() {
       </div>
     );
   }
-  
+
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar user={user} />
-      
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-gray-900">AI Wellness Assistant</h1>
@@ -935,28 +991,28 @@ export default function EmployeeChatPage() {
                 )}
                 {isVoiceMode && (
                   <>
-                    <Button 
-                      onClick={() => setAudioEnabled(!audioEnabled)} 
-                      variant="outline" 
+                    <Button
+                      onClick={() => setAudioEnabled(!audioEnabled)}
+                      variant="outline"
                       size="sm"
                       title={audioEnabled ? "Disable AI voice" : "Enable AI voice"}
                     >
                       {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
                     </Button>
                     {isSpeaking && (
-                      <Button 
-                        onClick={toggleSpeaking} 
-                        variant="outline" 
+                      <Button
+                        onClick={toggleSpeaking}
+                        variant="outline"
                         size="sm"
                         title="Stop AI speaking"
                       >
                         <Square className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button 
-                      onClick={toggleRecording} 
+                    <Button
+                      onClick={toggleRecording}
                       disabled={processingAudio || loading}
-                      variant={isRecording ? "destructive" : "outline"} 
+                      variant={isRecording ? "destructive" : "outline"}
                       size="sm"
                       title={isRecording ? "Stop recording" : "Start recording"}
                     >
@@ -997,11 +1053,10 @@ export default function EmployeeChatPage() {
                       {message.sender === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                     </AvatarFallback>
                   </Avatar>
-                  <div className={`rounded-lg px-4 py-2 text-sm ${
-                    message.sender === 'user' 
-                      ? 'bg-blue-600 text-white' 
+                  <div className={`rounded-lg px-4 py-2 text-sm ${message.sender === 'user'
+                      ? 'bg-blue-600 text-white'
                       : 'bg-white text-gray-800 border'
-                  }`}>
+                    }`}>
                     {message.sender === 'ai' ? (
 
 
@@ -1018,7 +1073,7 @@ export default function EmployeeChatPage() {
                 </div>
               </div>
             ))}
-            
+
             {(loading || processingAudio) && (
               <div className="flex justify-start">
                 <div className="flex items-start space-x-3 max-w-[85%]">
@@ -1036,7 +1091,7 @@ export default function EmployeeChatPage() {
                 </div>
               </div>
             )}
-            
+
             {sessionEnded && generatedReport && (
               <Card className="bg-green-50 border-green-200 p-4">
                 <CardHeader className='p-2'>
@@ -1052,7 +1107,7 @@ export default function EmployeeChatPage() {
                   <div className="prose prose-sm max-w-none bg-white p-4 rounded-md border">
                     <ReactMarkdown>{generatedReport.complete_report}</ReactMarkdown>
                   </div>
-                  
+
                   {generatedReport.key_insights && generatedReport.key_insights.length > 0 && (
                     <div className="mt-4 bg-blue-50 p-3 rounded-md">
                       <h4 className="font-medium text-blue-900 mb-2">Key Insights:</h4>
@@ -1066,7 +1121,7 @@ export default function EmployeeChatPage() {
                       </ul>
                     </div>
                   )}
-                  
+
                   {generatedReport.recommendations && generatedReport.recommendations.length > 0 && (
                     <div className="mt-4 bg-purple-50 p-3 rounded-md">
                       <h4 className="font-medium text-purple-900 mb-2">Recommendations:</h4>
@@ -1080,21 +1135,21 @@ export default function EmployeeChatPage() {
                       </ul>
                     </div>
                   )}
-                  
+
                   <div className="mt-4 text-xs text-gray-500 flex items-center justify-between">
                     <span>
-                      Session Type: {generatedReport.session_type} • 
+                      Session Type: {generatedReport.session_type} •
                       Duration: {Math.floor(generatedReport.session_duration / 60)}m {generatedReport.session_duration % 60}s
                     </span>
-                    <Button 
-                      size="sm" 
+                    <Button
+                      size="sm"
                       variant="outline"
                       onClick={() => router.push('/employee/reports')}
                     >
                       View All Reports
                     </Button>
                   </div>
-                  
+
                   <p className="text-xs text-gray-500 mt-2">
                     This report is confidential and intended to help you track your well-being.
                   </p>
@@ -1105,70 +1160,202 @@ export default function EmployeeChatPage() {
             <div ref={messagesEndRef} />
           </CardContent>
 
-          <div className="border-t p-4 bg-white">
-            {isVoiceMode && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-blue-900">Voice Mode Active</span>
-                  <span className="text-sm text-blue-700">{formatCallDuration(callDuration)}</span>
+          {/* Voice Chat UI - Full Screen Overlay */}
+          {isVoiceMode && (
+            <div className="fixed inset-0 z-50 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
+              {/* Background Animation */}
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl animate-pulse delay-500"></div>
+              </div>
+
+              {/* Main Voice Interface */}
+              <div className="relative z-10 flex flex-col items-center justify-center text-white">
+                {/* Header */}
+                <div className="absolute top-8 left-8 right-8 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                    <span className="text-lg font-medium">Voice Session Active</span>
+                  </div>
+                  <div className="text-lg font-mono">
+                    {formatCallDuration(callDuration)}
+                  </div>
                 </div>
-                
-                <div className="flex items-center space-x-4 text-sm">
+
+                {/* Central Glowing Circle */}
+                <div className="relative mb-12">
+                  {/* Outer glow rings */}
+                  <div className={`absolute inset-0 rounded-full ${
+                    isRecording 
+                      ? 'animate-ping bg-red-400/30' 
+                      : isSpeaking 
+                        ? 'animate-pulse bg-green-400/30' 
+                        : processingAudio 
+                          ? 'animate-spin bg-yellow-400/30' 
+                          : 'animate-pulse bg-blue-400/30'
+                  } scale-150`}></div>
+                  
+                  <div className={`absolute inset-0 rounded-full ${
+                    isRecording 
+                      ? 'animate-pulse bg-red-400/20' 
+                      : isSpeaking 
+                        ? 'animate-pulse bg-green-400/20' 
+                        : processingAudio 
+                          ? 'animate-pulse bg-yellow-400/20' 
+                          : 'animate-pulse bg-blue-400/20'
+                  } scale-125`}></div>
+
+                  {/* Main circle */}
+                  <div className={`relative w-64 h-64 rounded-full border-4 ${
+                    isRecording 
+                      ? 'border-red-400 bg-red-500/20 shadow-red-400/50' 
+                      : isSpeaking 
+                        ? 'border-green-400 bg-green-500/20 shadow-green-400/50' 
+                        : processingAudio 
+                          ? 'border-yellow-400 bg-yellow-500/20 shadow-yellow-400/50' 
+                          : 'border-blue-400 bg-blue-500/20 shadow-blue-400/50'
+                  } shadow-2xl backdrop-blur-sm flex items-center justify-center transition-all duration-300`}>
+                    
+                    {/* Inner content */}
+                    <div className="text-center">
+                      {isRecording && (
+                        <>
+                          <Mic className="w-16 h-16 mx-auto mb-4 text-red-400 animate-pulse" />
+                          <p className="text-xl font-medium text-red-300">Listening...</p>
+                          <p className="text-sm text-red-200 mt-2">Speak naturally</p>
+                        </>
+                      )}
+                      
+                      {isSpeaking && (
+                        <>
+                          <Volume2 className="w-16 h-16 mx-auto mb-4 text-green-400 animate-pulse" />
+                          <p className="text-xl font-medium text-green-300">AI Speaking...</p>
+                          <div className="flex justify-center space-x-1 mt-4">
+                            <div className="w-2 h-8 bg-green-400 rounded animate-pulse"></div>
+                            <div className="w-2 h-6 bg-green-400 rounded animate-pulse delay-100"></div>
+                            <div className="w-2 h-10 bg-green-400 rounded animate-pulse delay-200"></div>
+                            <div className="w-2 h-4 bg-green-400 rounded animate-pulse delay-300"></div>
+                            <div className="w-2 h-7 bg-green-400 rounded animate-pulse delay-400"></div>
+                          </div>
+                        </>
+                      )}
+                      
+                      {processingAudio && (
+                        <>
+                          <Loader2 className="w-16 h-16 mx-auto mb-4 text-yellow-400 animate-spin" />
+                          <p className="text-xl font-medium text-yellow-300">Processing...</p>
+                          <p className="text-sm text-yellow-200 mt-2">Understanding your message</p>
+                        </>
+                      )}
+                      
+                      {!isRecording && !isSpeaking && !processingAudio && (
+                        <>
+                          <Bot className="w-16 h-16 mx-auto mb-4 text-blue-400" />
+                          <p className="text-xl font-medium text-blue-300">Ready to Listen</p>
+                          <p className="text-sm text-blue-200 mt-2">Tap to speak</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Text */}
+                <div className="text-center mb-8">
                   {isRecording && (
-                    <div className="flex items-center space-x-2 text-red-600">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                      <span>Recording...</span>
-                    </div>
-                  )}
-                  {processingAudio && (
-                    <div className="flex items-center space-x-2 text-yellow-600">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span>Processing audio...</span>
-                    </div>
+                    <p className="text-lg text-red-300">🎤 Recording your voice...</p>
                   )}
                   {isSpeaking && (
-                    <div className="flex items-center space-x-2 text-green-600">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span>AI Speaking...</span>
-                    </div>
+                    <p className="text-lg text-green-300">🔊 AI is responding...</p>
+                  )}
+                  {processingAudio && (
+                    <p className="text-lg text-yellow-300">⚡ Processing your message...</p>
+                  )}
+                  {!isRecording && !isSpeaking && !processingAudio && (
+                    <p className="text-lg text-blue-300">💬 Continuous voice conversation</p>
                   )}
                 </div>
-                
-                <div className="mt-2 text-xs text-gray-600">
-                  Click the microphone button to record your message, or type below
+
+                {/* Control Buttons */}
+                <div className="flex items-center space-x-6">
+                  {/* Record Button */}
+                  <button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={processingAudio || isSpeaking}
+                    className={`w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+                      isRecording
+                        ? 'bg-red-500 border-red-400 hover:bg-red-600 shadow-red-400/50'
+                        : 'bg-white/10 border-white/30 hover:bg-white/20 hover:border-white/50'
+                    } shadow-lg backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {isRecording ? (
+                      <Square className="w-6 h-6 text-white" />
+                    ) : (
+                      <Mic className="w-6 h-6 text-white" />
+                    )}
+                  </button>
+
+                  {/* Mute/Unmute Button */}
+                  <button
+                    onClick={() => setAudioEnabled(!audioEnabled)}
+                    className="w-16 h-16 rounded-full border-2 border-white/30 bg-white/10 hover:bg-white/20 hover:border-white/50 flex items-center justify-center transition-all duration-300 shadow-lg backdrop-blur-sm"
+                  >
+                    {audioEnabled ? (
+                      <Volume2 className="w-6 h-6 text-white" />
+                    ) : (
+                      <VolumeX className="w-6 h-6 text-white" />
+                    )}
+                  </button>
+
+                  {/* End Call Button */}
+                  <button
+                    onClick={endCall}
+                    className="w-16 h-16 rounded-full border-2 border-red-400 bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-300 shadow-lg shadow-red-400/50"
+                  >
+                    <PhoneOff className="w-6 h-6 text-white" />
+                  </button>
+                </div>
+
+                {/* Instructions */}
+                <div className="absolute bottom-8 left-8 right-8 text-center">
+                  <p className="text-white/70 text-sm">
+                    Tap and hold the microphone to speak • Voice responses are automatic
+                  </p>
+                  <p className="text-white/50 text-xs mt-2">
+                    End the call when you're ready to receive your wellness report
+                  </p>
                 </div>
               </div>
-            )}
-            
+            </div>
+          )}
+
+          <div className="border-t p-4 bg-white">
             <div className="flex space-x-2">
               <Input
                 placeholder={
-                  sessionEnded 
-                    ? "This session has ended." 
-                    : isVoiceMode 
-                      ? "Voice input active - or type here..." 
+                  sessionEnded
+                    ? "This session has ended."
+                    : isVoiceMode
+                      ? "Voice mode active - switch to text if needed..."
                       : "Type your message..."
                 }
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                disabled={loading || sessionEnded || processingAudio}
+                disabled={loading || sessionEnded || processingAudio || isVoiceMode}
                 className="flex-1"
               />
-              <Button 
-                onClick={() => handleSendMessage()} 
-                disabled={loading || sessionEnded || !currentMessage.trim() || processingAudio}
+              <Button
+                onClick={() => handleSendMessage()}
+                disabled={loading || sessionEnded || !currentMessage.trim() || processingAudio || isVoiceMode}
               >
                 <Send className="h-4 w-4" />
               </Button>
             </div>
-            
-            {!sessionEnded && (
+
+            {!sessionEnded && !isVoiceMode && (
               <p className="text-xs text-gray-500 mt-2">
-                {isVoiceMode 
-                  ? "Use the microphone button to record voice messages, or type your message. End the voice chat to generate your report."
-                  : "Press Enter to send. When you're ready, end the session to get your report."
-                }
+                Press Enter to send. When you're ready, end the session to get your report.
               </p>
             )}
           </div>

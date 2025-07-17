@@ -83,7 +83,7 @@ export default function NewReportPage() {
 
     try {
       // Assuming 'db' is imported from '@/lib/firebase'
-      await addDoc(collection(db, 'mentalHealthReports'), reportToSave);
+      await addDoc(collection(db, 'mental_health_reports'), reportToSave);
 
       // No specific error check needed for addDoc success, caught by the catch block
 

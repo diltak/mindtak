@@ -22,7 +22,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { MentalHealthReport, User } from '@/types';
 
@@ -47,7 +47,7 @@ export default function EmployerReportsPage() {
     }
 
     if (user?.role !== 'employer') {
-      router.push('/employee/dashboard');
+      // router.push('/employee/dashboard');
       return;
     }
 
@@ -76,28 +76,30 @@ export default function EmployerReportsPage() {
       const employeeIds = employees?.map(emp => emp.id) || [];
 
       // Fetch all reports for company employees
-      const reportsRef = collection(db, 'mentalHealthReports');
-      // Firestore does not support 'in' with more than 10 elements
-      // For simplicity, fetching all reports for the company and filtering client-side
-      // A more scalable approach would involve a server function or batching
+      const reportsRef = collection(db, 'mental_health_reports');
       const reportsQuery = query(reportsRef, 
-        where('company_id', '==', user.company_id),
-        orderBy('created_at', 'desc')
+        where('company_id', '==', user.company_id)
+        // Removed orderBy to avoid index requirements - will sort in JavaScript
       );
       const reportsSnapshot = await getDocs(reportsQuery);
       const reportsData = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as MentalHealthReport[];
 
-      // Combine reports with employee data (anonymized) and filter by employeeIds
-      const reportsWithEmployees: ReportWithEmployee[] = reportsData?.map(report => {
+      // Sort reports by created_at in JavaScript (newest first)
+      const sortedReportsData = reportsData.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      // Combine reports with employee data and filter by employeeIds
+      const reportsWithEmployees: ReportWithEmployee[] = sortedReportsData?.map(report => {
         const employee = employees.find(emp => emp.id === report.employee_id);
         return {
           ...report,
           employee: employee ? {
             ...employee,
-            // Anonymize employee data for privacy
-            first_name: 'Anonymous',
-            last_name: 'Employee', // Placeholder, actual anonymization may vary
-            email: `anonymous-${employee.id?.slice(0, 8)}@company.com`, // Placeholder
+            // Show actual employee names for employer view
+            first_name: employee.first_name || 'Unknown',
+            last_name: employee.last_name || 'Employee',
+            email: employee.email || `employee-${employee.id?.slice(0, 8)}@company.com`,
           } : undefined,
         };
       }).filter(report => employeeIds.includes(report.employee_id))
@@ -192,7 +194,7 @@ export default function EmployerReportsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Wellness Reports</h1>
             <p className="text-gray-600 mt-2">
-              View anonymized wellness reports from your team members.
+              View wellness reports from your team members and track their mental health progress.
             </p>
           </div>
           <div className="flex items-center space-x-4 mt-4 sm:mt-0">
@@ -343,7 +345,7 @@ export default function EmployerReportsPage() {
                     <div className="flex items-center space-x-4 mb-4 lg:mb-0">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
-                          Anonymous Employee Report
+                          {report.employee ? `${report.employee.first_name} ${report.employee.last_name}` : 'Employee Report'}
                         </h3>
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <span>
@@ -470,10 +472,10 @@ export default function EmployerReportsPage() {
           <CardContent className="p-6">
             <h3 className="font-semibold text-gray-900 mb-3">Privacy & Confidentiality</h3>
             <div className="text-sm text-gray-600 space-y-2">
-              <p>• All employee data is anonymized to protect individual privacy</p>
-              <p>• Personal comments and identifiable information are kept confidential</p>
-              <p>• Only aggregated trends and patterns are shown for organizational insights</p>
-              <p>• Individual employee wellness data cannot be traced back to specific team members</p>
+              <p>• Employee wellness reports are visible to authorized managers and HR personnel</p>
+              <p>• Personal comments and sensitive information are kept confidential when marked as private</p>
+              <p>• Data is used to provide appropriate support and improve workplace wellness programs</p>
+              <p>• All wellness data is handled in accordance with company privacy policies</p>
               <p>• All data is encrypted and stored securely in compliance with privacy regulations</p>
             </div>
           </CardContent>

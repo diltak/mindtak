@@ -55,19 +55,24 @@ export default function EmployeeReportsPage() {
     if (!user) return;
 
     try {
-      const reportsCollection = collection(db, 'mentalHealthReports');
+      const reportsCollection = collection(db, 'mental_health_reports');
       const q = query(
         reportsCollection,
-        where('employee_id', '==', user.id),
-        orderBy('created_at', 'desc')
+        where('employee_id', '==', user.id)
       );
       const querySnapshot = await getDocs(q);
       
       const data = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })) as MentalHealthReport[]; // Cast to MentalHealthReport[]
-      setReports(data);
+      })) as MentalHealthReport[];
+      
+      // Sort by created_at in JavaScript to avoid Firestore index requirements
+      const sortedData = data.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      setReports(sortedData);
     } catch (error) {
       console.error('Error fetching reports:', error);
     } finally {

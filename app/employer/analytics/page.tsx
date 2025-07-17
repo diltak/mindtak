@@ -5,27 +5,28 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Users, 
+import {
+  TrendingUp,
+  Users,
   Brain,
   AlertTriangle,
   Calendar,
   Download,
   Filter,
-  RefreshCw
+  RefreshCw,
+  BarChart3,
+  Activity
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
+import { Navbar } from '@/components/shared/navbar';
 import { db } from '@/lib/firebase';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   BarChart,
   Bar,
@@ -33,26 +34,41 @@ import {
   Pie,
   Cell,
   AreaChart,
- Area
+  Area
 } from 'recharts';
 import {
   collection,
   query,
   where,
-  getDocs,
-  orderBy,
-  limit
+  getDocs
 } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 import type { MentalHealthReport, User } from '@/types/index';
 
 interface AnalyticsData {
-  departmentStats: { [key: string]: { count: number; avgWellness: number; avgStress: number } };
-  trendData: { date: string; wellness: number; stress: number; mood: number; energy: number }[];
+  departmentStats: { [key: string]: { count: number; avgWellness: number; avgStress: number; avgMood: number; avgEnergy: number } };
+  trendData: { date: string; wellness: number; stress: number; mood: number; energy: number; reports: number }[];
   riskDistribution: { name: string; value: number; color: string }[];
   monthlyReports: { month: string; reports: number; avgWellness: number }[];
-  correlationData: { metric: string; correlation: number }[];
+  wellnessMetrics: {
+    totalEmployees: number;
+    totalReports: number;
+    avgWellness: number;
+    highRiskCount: number;
+    mediumRiskCount: number;
+    lowRiskCount: number;
+  };
 }
+
+const COLORS = {
+  primary: '#3B82F6',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  purple: '#8B5CF6',
+  teal: '#14B8A6'
+};
 
 export default function AnalyticsPage() {
   const router = useRouter();
@@ -62,7 +78,14 @@ export default function AnalyticsPage() {
     trendData: [],
     riskDistribution: [],
     monthlyReports: [],
-    correlationData: [],
+    wellnessMetrics: {
+      totalEmployees: 0,
+      totalReports: 0,
+      avgWellness: 0,
+      highRiskCount: 0,
+      mediumRiskCount: 0,
+      lowRiskCount: 0,
+    }
   });
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30');
@@ -75,7 +98,8 @@ export default function AnalyticsPage() {
     }
 
     if (user?.role !== 'employer') {
-      router.push('/employee/dashboard');
+      toast.error('Access denied. Employer role required.');
+      // router.push('/auth/signin')//;
       return;
     }
 
@@ -89,133 +113,166 @@ export default function AnalyticsPage() {
     try {
       const companyId = user?.company_id;
       if (!companyId) {
+        console.log('No company ID found');
         setLoading(false);
         return;
       }
 
+      console.log('Fetching analytics for company:', companyId);
+
       // Fetch company employees
       const employeesRef = collection(db, 'users');
-      const employeesQuery = query(employeesRef, where('company_id', '==', companyId), where('role', '==', 'employee'));
+      const employeesQuery = query(
+        employeesRef,
+        where('company_id', '==', companyId),
+        where('role', '==', 'employee')
+      );
       const employeeSnapshot = await getDocs(employeesQuery);
-      const employees: User[] = employeeSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      const employees: User[] = employeeSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as User));
 
-      const employeeIds = employees.map(emp => emp.id).filter(id => id !== undefined) as string[];
+      console.log('Found employees:', employees.length);
 
       // Calculate date range
-      const daysAgo = parseInt(timeRange); // Ensure daysAgo is declared here
+      const daysAgo = parseInt(timeRange);
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - daysAgo);
 
-      // Fetch reports within date range
-      const reportsRef = collection(db, 'mentalHealthReports');
-      let reportsQuery = query(reportsRef, where('employee_id', 'in', employeeIds), where('created_at', '>=', startDate.toISOString()), orderBy('created_at', 'asc'));
+      // Fetch all reports for company (without date filter to avoid composite index requirement)
+      const reportsRef = collection(db, 'mental_health_reports');
+      const reportsQuery = query(
+        reportsRef,
+        where('company_id', '==', companyId)
+      );
 
       const reportSnapshot = await getDocs(reportsQuery);
-      const reports: MentalHealthReport[] = reportSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MentalHealthReport));
+      const allReportsRaw: MentalHealthReport[] = reportSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as MentalHealthReport));
 
-      // TODO: Replace with Firebase query for reports
-      // Need a mentalHealthReports collection with employee_id and created_at fields
+      // Filter by date in JavaScript
+      const allReports = allReportsRaw.filter(report =>
+        new Date(report.created_at) >= startDate
+      );
+
+      console.log('Found reports:', allReports.length);
+      console.log('Date range:', startDate.toISOString(), 'to', new Date().toISOString());
+
       // Filter by department if selected
-      let filteredEmployees = employees || [];
+      let filteredEmployees = employees;
       if (selectedDepartment !== 'all') {
-        filteredEmployees = employees?.filter(emp => emp.department === selectedDepartment) || [];
- }
-      const filteredEmployeeIdsSet = new Set(filteredEmployees.map(emp => emp.id));
-      const filteredReports = reports?.filter((report: MentalHealthReport) =>
-        filteredEmployeeIdsSet.has(report.employee_id)
-      ) || [];
+        filteredEmployees = employees.filter(emp => emp.department === selectedDepartment);
+      }
+
+      const filteredEmployeeIds = new Set(filteredEmployees.map(emp => emp.id));
+      const filteredReports = allReports.filter(report =>
+        filteredEmployeeIds.has(report.employee_id)
+      );
+
+      console.log('Filtered reports:', filteredReports.length);
+
+      // Calculate wellness metrics
+      const wellnessMetrics = {
+        totalEmployees: filteredEmployees.length,
+        totalReports: filteredReports.length,
+        avgWellness: filteredReports.length > 0
+          ? Math.round((filteredReports.reduce((sum, r) => sum + r.overall_wellness, 0) / filteredReports.length) * 10) / 10
+          : 0,
+        highRiskCount: filteredReports.filter(r => r.risk_level === 'high').length,
+        mediumRiskCount: filteredReports.filter(r => r.risk_level === 'medium').length,
+        lowRiskCount: filteredReports.filter(r => r.risk_level === 'low').length,
+      };
+
       // Calculate department statistics
-      const departmentStats: { [key: string]: { count: number; avgWellness: number; avgStress: number } } = {};
-      
+      const departmentStats: { [key: string]: { count: number; avgWellness: number; avgStress: number; avgMood: number; avgEnergy: number } } = {};
+
       filteredEmployees.forEach(employee => {
         const dept = employee.department || 'Unassigned';
         const employeeReports = filteredReports.filter(r => r.employee_id === employee.id);
-        
+
         if (!departmentStats[dept]) {
-          departmentStats[dept] = { count: 0, avgWellness: 0, avgStress: 0 };
+          departmentStats[dept] = { count: 0, avgWellness: 0, avgStress: 0, avgMood: 0, avgEnergy: 0 };
         }
-        
+
         departmentStats[dept].count++;
 
         if (employeeReports.length > 0) {
-          departmentStats[dept].avgWellness = employeeReports.reduce((sum: number, r: MentalHealthReport) => sum + r.overall_wellness, 0) / employeeReports.length;
-          departmentStats[dept].avgStress = employeeReports.reduce((sum: number, r: MentalHealthReport) => sum + r.stress_level, 0) / employeeReports.length;
+          departmentStats[dept].avgWellness = Math.round((employeeReports.reduce((sum, r) => sum + r.overall_wellness, 0) / employeeReports.length) * 10) / 10;
+          departmentStats[dept].avgStress = Math.round((employeeReports.reduce((sum, r) => sum + r.stress_level, 0) / employeeReports.length) * 10) / 10;
+          departmentStats[dept].avgMood = Math.round((employeeReports.reduce((sum, r) => sum + r.mood_rating, 0) / employeeReports.length) * 10) / 10;
+          departmentStats[dept].avgEnergy = Math.round((employeeReports.reduce((sum, r) => sum + r.energy_level, 0) / employeeReports.length) * 10) / 10;
         }
       });
 
-      // Calculate trend data
-      const daysAgoTrend = parseInt(timeRange); // Use a different variable name
+      // Calculate trend data (daily averages)
       const trendData = [];
       for (let i = daysAgo - 1; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dateStr = date.toISOString().split('T')[0];
 
-        const dayReports = filteredReports.filter(r => 
+        const dayReports = filteredReports.filter(r =>
           r.created_at.split('T')[0] === dateStr
         );
 
         if (dayReports.length > 0) {
           trendData.push({
             date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            wellness: Math.round(dayReports.reduce((sum: number, r: MentalHealthReport) => sum + r.overall_wellness, 0) / dayReports.length),
-            stress: Math.round(dayReports.reduce((sum: number, r: MentalHealthReport) => sum + r.stress_level, 0) / dayReports.length),
-            mood: Math.round(dayReports.reduce((sum: number, r: MentalHealthReport) => sum + r.mood_rating, 0) / dayReports.length),
-            energy: Math.round(dayReports.reduce((sum: number, r: MentalHealthReport) => sum + r.energy_level, 0) / dayReports.length),
+            wellness: Math.round((dayReports.reduce((sum, r) => sum + r.overall_wellness, 0) / dayReports.length) * 10) / 10,
+            stress: Math.round((dayReports.reduce((sum, r) => sum + r.stress_level, 0) / dayReports.length) * 10) / 10,
+            mood: Math.round((dayReports.reduce((sum, r) => sum + r.mood_rating, 0) / dayReports.length) * 10) / 10,
+            energy: Math.round((dayReports.reduce((sum, r) => sum + r.energy_level, 0) / dayReports.length) * 10) / 10,
+            reports: dayReports.length
           });
         }
       }
 
       // Calculate risk distribution
-      const riskCounts = filteredReports.reduce((acc: { [key: string]: number }, report: MentalHealthReport) => {
-        acc[report.risk_level]++;
-        return acc;
-      }, { low: 0, medium: 0, high: 0 });
-
       const riskDistribution = [
-        { name: 'Low Risk', value: riskCounts.low, color: '#10B981' },
-        { name: 'Medium Risk', value: riskCounts.medium, color: '#F59E0B' },
-        { name: 'High Risk', value: riskCounts.high, color: '#EF4444' },
-      ];
+        { name: 'Low Risk', value: wellnessMetrics.lowRiskCount, color: COLORS.success },
+        { name: 'Medium Risk', value: wellnessMetrics.mediumRiskCount, color: COLORS.warning },
+        { name: 'High Risk', value: wellnessMetrics.highRiskCount, color: COLORS.danger },
+      ].filter(item => item.value > 0);
 
       // Calculate monthly reports
       const monthlyData: { [key: string]: { reports: number; totalWellness: number } } = {};
 
       filteredReports.forEach(report => {
-        const month = new Date(report.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) || 'Unknown Month';
+        const month = new Date(report.created_at).toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric'
+        });
+
         if (!monthlyData[month]) {
           monthlyData[month] = { reports: 0, totalWellness: 0 };
         }
-        monthlyData[month].reports = (monthlyData[month].reports || 0) + 1;
+
+        monthlyData[month].reports++;
         monthlyData[month].totalWellness += report.overall_wellness;
       });
 
-      const monthlyReports = Object.entries(monthlyData).map(([month, data]) => ({
-        month,
-        reports: data.reports,
-        avgWellness: Math.round(data.totalWellness / data.reports),
-      }));
+      const monthlyReports = Object.entries(monthlyData)
+        .map(([month, data]) => ({
+          month,
+          reports: data.reports,
+          avgWellness: Math.round((data.totalWellness / data.reports) * 10) / 10,
+        }))
+        .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
-      // Calculate correlation data (simplified)
-      const correlationData = [
-        { metric: 'Sleep Quality', correlation: 0.75 },
-        { metric: 'Work-Life Balance', correlation: 0.68 },
-        { metric: 'Energy Level', correlation: 0.82 },
-        { metric: 'Work Satisfaction', correlation: 0.71 },
-        { metric: 'Confidence Level', correlation: 0.64 },
-      ];
-
-      // TODO: Implement actual correlation calculation based on report data
       setAnalytics({
         departmentStats,
         trendData,
         riskDistribution,
         monthlyReports,
-        correlationData,
+        wellnessMetrics,
       });
 
     } catch (error) {
       console.error('Error fetching analytics:', error);
+      toast.error('Failed to load analytics data');
     } finally {
       setLoading(false);
     }
@@ -223,9 +280,47 @@ export default function AnalyticsPage() {
 
   const departments = Object.keys(analytics.departmentStats);
 
+  const exportData = async () => {
+    try {
+      toast.info('Preparing analytics export...');
+
+      const csvData = [
+        ['Metric', 'Value'],
+        ['Total Employees', analytics.wellnessMetrics.totalEmployees],
+        ['Total Reports', analytics.wellnessMetrics.totalReports],
+        ['Average Wellness', analytics.wellnessMetrics.avgWellness],
+        ['High Risk Employees', analytics.wellnessMetrics.highRiskCount],
+        ['Medium Risk Employees', analytics.wellnessMetrics.mediumRiskCount],
+        ['Low Risk Employees', analytics.wellnessMetrics.lowRiskCount],
+        [''],
+        ['Department', 'Employee Count', 'Avg Wellness', 'Avg Stress', 'Avg Mood', 'Avg Energy'],
+        ...Object.entries(analytics.departmentStats).map(([dept, stats]) => [
+          dept, stats.count, stats.avgWellness, stats.avgStress, stats.avgMood, stats.avgEnergy
+        ])
+      ];
+
+      const csvContent = csvData.map(row => row.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analytics-${timeRange}d-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Analytics exported successfully!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export analytics');
+    }
+  };
+
   if (userLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <Navbar user={user || undefined} />
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
         </div>
@@ -239,13 +334,14 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navbar user={user || undefined} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
             <p className="text-gray-600 mt-2">
-              Deep insights into your team's mental health and wellness trends.
+              Deep insights into your team's mental health and wellness trends
             </p>
           </div>
           <div className="flex items-center space-x-4 mt-4 sm:mt-0">
@@ -253,7 +349,7 @@ export default function AnalyticsPage() {
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={exportData}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -314,7 +410,7 @@ export default function AnalyticsPage() {
                 <Users className="h-8 w-8 text-blue-600" />
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {Object.values(analytics.departmentStats).reduce((sum, dept) => sum + dept.count, 0)}
+                    {analytics.wellnessMetrics.totalEmployees}
                   </div>
                   <p className="text-sm text-gray-600">Active Employees</p>
                 </div>
@@ -328,10 +424,7 @@ export default function AnalyticsPage() {
                 <Brain className="h-8 w-8 text-green-600" />
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {analytics.trendData.length > 0
-                      ? Math.round(analytics.trendData.reduce((sum: number, day) => sum + day.wellness, 0) / analytics.trendData.length)
-                      : 0
-                    }/10
+                    {analytics.wellnessMetrics.avgWellness}/10
                   </div>
                   <p className="text-sm text-gray-600">Avg Wellness</p>
                 </div>
@@ -345,7 +438,7 @@ export default function AnalyticsPage() {
                 <AlertTriangle className="h-8 w-8 text-red-600" />
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {analytics.riskDistribution.find(r => r.name === 'High Risk')?.value || 0}
+                    {analytics.wellnessMetrics.highRiskCount}
                   </div>
                   <p className="text-sm text-gray-600">High Risk</p>
                 </div>
@@ -356,17 +449,12 @@ export default function AnalyticsPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
-                <TrendingUp className="h-8 w-8 text-purple-600" />
+                <BarChart3 className="h-8 w-8 text-purple-600" />
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {analytics.trendData.length > 1
-                      ? analytics.trendData[analytics.trendData.length - 1].wellness > analytics.trendData[0].wellness
-                        ? '+' + Math.round(((analytics.trendData[analytics.trendData.length - 1].wellness - analytics.trendData[0].wellness) / analytics.trendData[0].wellness) * 100) + '%'
-                        : Math.round(((analytics.trendData[analytics.trendData.length - 1].wellness - analytics.trendData[0].wellness) / analytics.trendData[0].wellness) * 100) + '%'
-                      : '0%'
-                    }
+                    {analytics.wellnessMetrics.totalReports}
                   </div>
-                  <p className="text-sm text-gray-600">Wellness Trend</p>
+                  <p className="text-sm text-gray-600">Total Reports</p>
                 </div>
               </div>
             </CardContent>
@@ -378,25 +466,31 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <AreaChart className="h-5 w-5" /> {/* Corrected icon for area chart */}
+                <TrendingUp className="h-5 w-5" />
                 <span>Wellness Trends Over Time</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               {analytics.trendData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300} >
-                  <AreaChart data={analytics.trendData}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analytics.trendData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
                     <YAxis domain={[0, 10]} />
                     <Tooltip />
-                    <Area type="monotone" dataKey="wellness" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.3} name="Wellness" />
-                    <Area type="monotone" dataKey="mood" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} name="Mood" />
-                  </AreaChart>
+                    <Line type="monotone" dataKey="wellness" stroke={COLORS.primary} strokeWidth={2} name="Wellness" />
+                    <Line type="monotone" dataKey="mood" stroke={COLORS.success} strokeWidth={2} name="Mood" />
+                    <Line type="monotone" dataKey="energy" stroke={COLORS.purple} strokeWidth={2} name="Energy" />
+                    <Line type="monotone" dataKey="stress" stroke={COLORS.danger} strokeWidth={2} name="Stress" />
+                  </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-300 flex items-center justify-center text-gray-500">
-                  <p>No trend data available for the selected period.</p>
+                <div className="h-[300px] flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <Activity className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No trend data available for the selected period</p>
+                    <p className="text-sm mt-2">Try selecting a longer time range or check if employees have submitted reports</p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -411,10 +505,10 @@ export default function AnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {analytics.riskDistribution.some(r => r.value > 0) ? (
+              {analytics.riskDistribution.length > 0 ? (
                 <div className="space-y-4">
                   <ResponsiveContainer width="100%" height={200}>
-                    <PieChart >
+                    <PieChart>
                       <Pie
                         data={analytics.riskDistribution}
                         cx="50%"
@@ -431,13 +525,13 @@ export default function AnalyticsPage() {
                       <Tooltip />
                     </PieChart>
                   </ResponsiveContainer>
-                  
+
                   <div className="space-y-2">
                     {analytics.riskDistribution.map((item) => (
                       <div key={item.name} className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <div
-                            className="w-3 h-3 rounded-full" // TODO: Add type for item in map
+                            className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: item.color }}
                           ></div>
                           <span className="text-sm text-gray-700">{item.name}</span>
@@ -448,8 +542,11 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="h-200 flex items-center justify-center text-gray-500">
-                  <p>No risk data available.</p>
+                <div className="h-[200px] flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No risk data available</p>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -461,60 +558,67 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <BarChart className="h-5 w-5" /> {/* Corrected icon for bar chart */}
+                <BarChart3 className="h-5 w-5" />
                 <span>Department Wellness Comparison</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               {Object.keys(analytics.departmentStats).length > 0 ? (
-                <ResponsiveContainer width="100%" height={300} >
+                <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={Object.entries(analytics.departmentStats).map(([dept, stats]) => ({
                     department: dept,
-                    wellness: Math.round(stats.avgWellness),
-                    stress: Math.round(stats.avgStress),
+                    wellness: stats.avgWellness,
+                    stress: stats.avgStress,
+                    mood: stats.avgMood,
+                    energy: stats.avgEnergy,
                     employees: stats.count,
                   }))}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="department" />
                     <YAxis domain={[0, 10]} />
                     <Tooltip />
-                    <Bar dataKey="wellness" fill="#10B981" name="Avg Wellness" />
-                    <Bar dataKey="stress" fill="#EF4444" name="Avg Stress" />
+                    <Bar dataKey="wellness" fill={COLORS.primary} name="Avg Wellness" />
+                    <Bar dataKey="mood" fill={COLORS.success} name="Avg Mood" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-300 flex items-center justify-center text-gray-500">
-                  <p>No department data available.</p>
+                <div className="h-[300px] flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No department data available</p>
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Correlation Analysis */}
+          {/* Monthly Reports */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <TrendingUp className="h-5 w-5" />
-                <span>Wellness Correlation Factors</span>
+                <Calendar className="h-5 w-5" />
+                <span>Monthly Report Trends</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {analytics.correlationData.map((item) => (
-                  <div key={item.metric} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">{item.metric}</span>
-                      <span className="text-sm text-gray-600">{Math.round(item.correlation * 100)}%</span> {/* TODO: Add type for item in map */}
-                    </div> {/* TODO: Add type for item in map */}
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full" 
-                        style={{ width: `${item.correlation * 100}%` }}
-                      ></div>
-                    </div>
+              {analytics.monthlyReports.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={analytics.monthlyReports}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="reports" stroke={COLORS.teal} fill={COLORS.teal} fillOpacity={0.3} name="Reports" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-gray-500">
+                  <div className="text-center">
+                    <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No monthly data available</p>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -531,7 +635,7 @@ export default function AnalyticsPage() {
             {Object.keys(analytics.departmentStats).length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.entries(analytics.departmentStats).map(([dept, stats]) => (
-                  <div key={dept} className="p-4 bg-gray-50 rounded-lg">
+                  <div key={dept} className="p-4 bg-gray-50 rounded-lg border">
                     <h3 className="font-semibold text-gray-900 mb-3">{dept}</h3>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
@@ -540,16 +644,24 @@ export default function AnalyticsPage() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Avg Wellness:</span>
-                        <span className="font-medium">{Math.round(stats.avgWellness)}/10</span>
+                        <span className="font-medium">{stats.avgWellness}/10</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Avg Mood:</span>
+                        <span className="font-medium">{stats.avgMood}/10</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Avg Stress:</span>
-                        <span className="font-medium">{Math.round(stats.avgStress)}/10</span>
+                        <span className="font-medium">{stats.avgStress}/10</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Avg Energy:</span>
+                        <span className="font-medium">{stats.avgEnergy}/10</span>
                       </div>
                       <div className="mt-2">
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
-                            className="bg-green-600 h-2 rounded-full" // TODO: Add type for stats in map
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${(stats.avgWellness / 10) * 100}%` }}
                           ></div>
                         </div>
@@ -561,11 +673,25 @@ export default function AnalyticsPage() {
             ) : (
               <div className="text-center py-8">
                 <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-gray-500">No department data available.</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Department Data</h3>
+                <p className="text-gray-500 mb-4">
+                  No wellness reports found for the selected criteria.
+                </p>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <p>• Ensure employees have submitted wellness reports</p>
+                  <p>• Try selecting a longer time range</p>
+                  <p>• Check if the department filter is too restrictive</p>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Footer */}
+        <div className="mt-8 text-center text-sm text-gray-500">
+          <p>Analytics data is updated in real-time based on employee wellness reports</p>
+          <p className="mt-1">All data is aggregated and anonymized for privacy compliance</p>
+        </div>
       </div>
     </div>
   );
