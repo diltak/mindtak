@@ -18,7 +18,7 @@ import {
   Activity
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
-import { Navbar } from '@/components/shared/navbar';
+import { Navbar } from '@/components/shared/Navbar';
 import { db } from '@/lib/firebase';
 import {
   LineChart,

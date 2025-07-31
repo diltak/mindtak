@@ -22,7 +22,7 @@ export default function HomePage() {
                     <span>Employee Login</span>
                   </Button>
                 </Link>
-                <Link href="/auth/employer/login">
+                <Link href="/aut bordh/employer/login">
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <Building className="h-4 w-4" />
                     <span>Employer Login</span>
@@ -291,7 +291,7 @@ export default function HomePage() {
               </Button>
             </Link>
             <Link href="/contact">
-              <Button size="lg" variant="outline" className="px-8 py-3 text-white border-white hover:bg-white hover:text-blue-600">
+              <Button size="lg" variant="outline" className="px-8 py-3 border-white hover:bg-white hover:text-blue-600">
                 Contact Sales
               </Button>
             </Link>
