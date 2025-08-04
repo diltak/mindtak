@@ -16,23 +16,17 @@ export default function HomePage() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="hidden md:flex items-center space-x-2">
-                <Link href="/auth/employee/login">
+                <Link href="/auth/login">
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <Users className="h-4 w-4" />
-                    <span>Employee Login</span>
-                  </Button>
-                </Link>
-                <Link href="/auth/employer/login">
-                  <Button variant="ghost" className="flex items-center space-x-2">
-                    <Building className="h-4 w-4" />
-                    <span>Employer Login</span>
+                    <span>Sign In</span>
                   </Button>
                 </Link>
               </div>
-              <Link href="/auth/employer/register">
+              <Link href="/demo">
                 <Button className="flex items-center space-x-2">
                   <UserCheck className="h-4 w-4" />
-                  <span>Register as Employer</span>
+                  <span>Try Demo</span>
                 </Button>
               </Link>
             </div>
@@ -55,15 +49,15 @@ export default function HomePage() {
               and AI-driven analytics to create a healthier, more productive workplace.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/auth/employer/register">
+              <Link href="/auth/signup">
                 <Button size="lg" className="px-8 py-3 flex items-center space-x-2">
                   <Building className="h-5 w-5" />
-                  <span>Start as Employer</span>
+                  <span>Register Your Company</span>
                 </Button>
               </Link>
-              <Link href="#features">
+              <Link href="/demo">
                 <Button variant="outline" size="lg" className="px-8 py-3">
-                  Learn More
+                  Try Demo
                 </Button>
               </Link>
             </div>
@@ -102,11 +96,11 @@ export default function HomePage() {
                   <li>• Department-wise analytics</li>
                 </ul>
                 <div className="space-y-2">
-                  <Link href="/auth/employer/login">
-                    <Button className="w-full">Employer Login</Button>
+                  <Link href="/auth/login">
+                    <Button className="w-full">Employer Sign In</Button>
                   </Link>
-                  <Link href="/auth/employer/register">
-                    <Button variant="outline" className="w-full">Register New Company</Button>
+                  <Link href="/auth/signup">
+                    <Button variant="outline" className="w-full">Register Company</Button>
                   </Link>
                 </div>
               </CardContent>
@@ -132,8 +126,8 @@ export default function HomePage() {
                   <li>• Wellness resources and tips</li>
                 </ul>
                 <div className="space-y-2">
-                  <Link href="/auth/employee/login">
-                    <Button className="w-full bg-green-600 hover:bg-green-700">Employee Login</Button>
+                  <Link href="/auth/login">
+                    <Button className="w-full bg-green-600 hover:bg-green-700">Employee Sign In</Button>
                   </Link>
                   <p className="text-xs text-gray-500 text-center">
                     Account created by your employer
@@ -284,10 +278,10 @@ export default function HomePage() {
             more productive work environments.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/employer/register">
+            <Link href="/auth/signup">
               <Button size="lg" variant="secondary" className="px-8 py-3 flex items-center space-x-2">
                 <Building className="h-5 w-5" />
-                <span>Start Your Free Trial</span>
+                <span>Register Your Company</span>
               </Button>
             </Link>
             <Link href="/contact">

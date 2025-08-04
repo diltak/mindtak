@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import type { ChatMessage } from '@/types/index';
+import { getRecentReports, generateReportsAnalytics, formatReportsForAI, getPersonalHistory, formatPersonalHistoryForAI } from '@/lib/reports-service';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -26,7 +27,7 @@ interface WellnessReport {
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, endSession, sessionType = 'text', sessionDuration = 0 } = await request.json();
+    const { messages, endSession, sessionType = 'text', sessionDuration = 0, userId, companyId } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     if (endSession) {
       return await generateWellnessReport(messages, sessionType, sessionDuration);
     } else {
-      return await generateChatResponse(messages, sessionType);
+      return await generateChatResponse(messages, sessionType, userId, companyId);
     }
 
   } catch (error: any) {
@@ -50,8 +51,33 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function generateChatResponse(messages: ChatMessage[], sessionType: string) {
+async function generateChatResponse(messages: ChatMessage[], sessionType: string, userId?: string, companyId?: string) {
   try {
+    // Get company-wide reports context
+    let reportsContext = '';
+    if (companyId) {
+      try {
+        const recentReports = await getRecentReports(companyId, 7);
+        const analytics = generateReportsAnalytics(recentReports);
+        reportsContext = formatReportsForAI(recentReports, analytics);
+      } catch (error) {
+        console.error('Error fetching reports context:', error);
+        // Continue without reports context if there's an error
+      }
+    }
+
+    // Get personal history context
+    let personalContext = '';
+    if (userId && companyId) {
+      try {
+        const personalHistory = await getPersonalHistory(userId, companyId, 30);
+        personalContext = formatPersonalHistoryForAI(personalHistory);
+      } catch (error) {
+        console.error('Error fetching personal history:', error);
+        // Continue without personal context if there's an error
+      }
+    }
+
     // Prepare conversation context
     const conversationHistory = messages.map(msg => ({
       role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
@@ -68,7 +94,35 @@ async function generateChatResponse(messages: ChatMessage[], sessionType: string
 6. Avoid giving medical advice - focus on emotional support and active listening
 7. ${sessionType === 'voice' ? 'Keep responses concise since this is a voice conversation' : 'You can be slightly more detailed in text conversations'}
 
-Remember: This is a wellness check-in, not therapy. Be warm, understanding, and help them reflect on their current state.`;
+${personalContext ? `
+PERSONAL HISTORY CONTEXT:
+You have access to this user's previous wellness sessions and reports. Use this to provide continuity and personalized support:
+
+${personalContext}
+
+Use this personal history to:
+- Reference previous conversations naturally ("Last time we talked about...")
+- Track progress and acknowledge improvements or concerns
+- Build on previous insights and recommendations
+- Provide personalized follow-up questions
+- Celebrate progress or offer additional support for ongoing challenges
+- Remember recurring themes and patterns in their wellness journey
+` : ''}
+
+${reportsContext ? `
+COMPANY WELLNESS CONTEXT:
+You also have access to recent wellness data from the user's company. Use this context to provide more personalized support and identify patterns, but NEVER reveal specific details about other employees. You can reference general trends like "I notice stress levels have been higher across the company lately" or "Many team members have been reporting similar challenges."
+
+${reportsContext}
+
+Use this information to:
+- Provide context-aware support
+- Identify if the user's experience aligns with company trends
+- Offer relevant insights without breaching privacy
+- Suggest company-wide wellness initiatives when appropriate
+` : ''}
+
+Remember: This is a wellness check-in, not therapy. Be warm, understanding, and help them reflect on their current state. Use both personal and company context to provide the most supportive and relevant conversation possible.`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',

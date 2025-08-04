@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Brain, LogOut, Settings, User } from 'lucide-react';
+import { Brain, LogOut, Settings, User, ChevronDown } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
@@ -85,6 +85,41 @@ export function Navbar({ user }: NavbarProps) {
                 </>
               )}
               
+              {(user.role === 'manager' || (user.direct_reports && user.direct_reports.length > 0)) && (
+                <>
+                  <Link 
+                    href="/manager/dashboard" 
+                    className={`text-sm font-medium transition-colors ${
+                      pathname === '/manager/dashboard' 
+                        ? 'text-blue-600' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Team Dashboard
+                  </Link>
+                  <Link 
+                    href="/manager/org-chart" 
+                    className={`text-sm font-medium transition-colors ${
+                      pathname === '/manager/org-chart' 
+                        ? 'text-blue-600' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Org Chart
+                  </Link>
+                  <Link 
+                    href="/employee/chat" 
+                    className={`text-sm font-medium transition-colors ${
+                      pathname === '/employee/chat' 
+                        ? 'text-blue-600' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    AI Assistant
+                  </Link>
+                </>
+              )}
+
               {user.role === 'employer' && (
                 <>
                   <Link 
@@ -164,11 +199,31 @@ export function Navbar({ user }: NavbarProps) {
             </DropdownMenu>
           ) : (
             <div className="flex items-center space-x-4">
-              <Link href="/auth/signin">
-                <Button variant="ghost">Sign In</Button>
-              </Link>
-              <Link href="/auth/signup">
-                <Button>Get Started</Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center space-x-1">
+                    <span>Login</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href="/auth/login" className="flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Sign In</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/login" className="flex items-center">
+                      <span>Demo Mode</span>
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <Link href="/demo">
+                <Button>Try Demo</Button>
               </Link>
             </div>
           )}

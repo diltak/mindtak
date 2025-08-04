@@ -59,9 +59,9 @@ export default function ResetPasswordPage() {
       setSuccess(true);
       toast.success('Password updated successfully!');
       
-      // Redirect to sign in after a short delay
+      // Redirect to home after a short delay
       setTimeout(() => {
-        router.push('/auth/signin');
+        router.push('/');
       }, 2000);
 
     } catch (err) {

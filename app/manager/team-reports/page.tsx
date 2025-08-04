@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   FileText, 
   Download, 
@@ -20,87 +21,75 @@ import {
   CheckCircle,
   Clock,
   Users,
-  BarChart3
+  BarChart3,
+  ArrowLeft,
+  Eye,
+  Shield
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { MentalHealthReport, User } from '@/types';
-import { getHierarchyFilteredReports, getManagerPermissions } from '@/lib/hierarchy-service';
+import { getHierarchyFilteredReports, getDirectReports } from '@/lib/hierarchy-service';
+import { getDemoUser, demoReports, demoUsers } from '@/lib/demo-data';
+import type { MentalHealthReport, User } from '@/types/index';
 
 interface ReportWithEmployee extends MentalHealthReport {
   employee?: User;
 }
 
-export default function EmployerReportsPage() {
+export default function ManagerTeamReportsPage() {
   const { user, loading: userLoading } = useUser();
   const router = useRouter();
   const [reports, setReports] = useState<ReportWithEmployee[]>([]);
+  const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRisk, setFilterRisk] = useState<string>('all');
-  const [filterDepartment, setFilterDepartment] = useState<string>('all');
+  const [filterEmployee, setFilterEmployee] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
 
   useEffect(() => {
-    if (!userLoading && !user) {
-      router.push('/');
-      return;
-    }
+    fetchTeamReports();
+  }, [user, userLoading]);
 
-    if (user?.role !== 'employer') {
-      // router.push('/employee/dashboard');
-      return;
-    }
-
-    if (user) {
-      fetchReports();
-    }
-  }, [user, userLoading, router]);
-
-  const fetchReports = async () => {
+  const fetchTeamReports = async () => {
     try {
-      if (!user?.company_id) {
-        console.error('User or company ID not available');
-        setLoading(false);
-        return;
-      }
-
-      // Check user permissions
-      const permissions = getManagerPermissions(user);
+      setLoading(true);
       
-      // Use hierarchy-aware filtering for reports
-      const filteredReports = await getHierarchyFilteredReports(user.id, user.company_id, 30);
+      // Use demo user if no real user
+      const currentUser = user || getDemoUser('manager');
+      
+      try {
+        // Try to get real data
+        const filteredReports = await getHierarchyFilteredReports(currentUser.id, currentUser.company_id || 'demo-company', 30);
+        const directReports = await getDirectReports(currentUser.id);
+        
+        // Combine reports with employee data
+        const reportsWithEmployees: ReportWithEmployee[] = filteredReports.map(report => {
+          const employee = directReports.find(emp => emp.id === report.employee_id);
+          return {
+            ...report,
+            employee
+          };
+        });
 
-      // Fetch all company employees for display purposes
-      const employeesRef = collection(db, 'users');
-      const employeesQuery = query(employeesRef, 
-        where('company_id', '==', user.company_id),
-        where('is_active', '==', true)
-      );
-      const employeesSnapshot = await getDocs(employeesQuery);
-      const employees = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as User[];
-
-      // Combine reports with employee data
-      const reportsWithEmployees: ReportWithEmployee[] = filteredReports.map(report => {
-        const employee = employees.find(emp => emp.id === report.employee_id);
-        return {
-          ...report,
-          employee: employee ? {
-            ...employee,
-            // Show appropriate level of detail based on permissions
-            first_name: employee.first_name || 'Unknown',
-            last_name: employee.last_name || 'Employee',
-            email: permissions.can_view_team_reports 
-              ? employee.email || `employee-${employee.id?.slice(0, 8)}@company.com`
-              : 'Hidden for privacy',
-          } : undefined,
-        };
-      });
-
-      setReports(reportsWithEmployees);
+        setReports(reportsWithEmployees);
+        setTeamMembers(directReports);
+      } catch (error) {
+        console.log('Using demo data for team reports');
+        // Use demo data
+        const demoTeamMembers = demoUsers.filter(u => u.manager_id === 'demo-manager-1');
+        const reportsWithEmployees: ReportWithEmployee[] = demoReports.map(report => {
+          const employee = demoTeamMembers.find(emp => emp.id === report.employee_id);
+          return {
+            ...report,
+            employee
+          };
+        });
+        
+        setReports(reportsWithEmployees);
+        setTeamMembers(demoTeamMembers);
+      }
     } catch (error) {
-      console.error('Error fetching reports:', error);
+      console.error('Error fetching team reports:', error);
     } finally {
       setLoading(false);
     }
@@ -125,17 +114,16 @@ export default function EmployerReportsPage() {
     );
   };
 
-  const departments = Array.from(new Set(reports.map(report => report.employee?.department).filter(Boolean)));
-
   const filteredReports = reports.filter(report => {
     const matchesSearch = searchTerm === '' || 
-      report.employee?.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      report.employee?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      report.employee?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       new Date(report.created_at).toLocaleDateString().includes(searchTerm);
     
     const matchesRisk = filterRisk === 'all' || report.risk_level === filterRisk;
-    const matchesDepartment = filterDepartment === 'all' || report.employee?.department === filterDepartment;
+    const matchesEmployee = filterEmployee === 'all' || report.employee_id === filterEmployee;
     
-    return matchesSearch && matchesRisk && matchesDepartment;
+    return matchesSearch && matchesRisk && matchesEmployee;
   });
 
   const sortedReports = [...filteredReports].sort((a, b) => {
@@ -158,14 +146,12 @@ export default function EmployerReportsPage() {
     }
   });
 
-  const generateReport = () => {
-    // This would generate a comprehensive report
-    console.log('Generating comprehensive report...');
-  };
+  const currentUser = user || getDemoUser('manager');
 
-  if (userLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <Navbar user={currentUser} />
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
         </div>
@@ -173,27 +159,27 @@ export default function EmployerReportsPage() {
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar user={user} />
+      <Navbar user={currentUser} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Wellness Reports</h1>
+            <Link href="/manager/dashboard" className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900">Team Wellness Reports</h1>
             <p className="text-gray-600 mt-2">
-              View wellness reports from your team members and track their mental health progress.
+              View and monitor wellness reports from your direct reports and team members.
             </p>
           </div>
           <div className="flex items-center space-x-4 mt-4 sm:mt-0">
-            <Button variant="outline" onClick={generateReport}>
+            <Button variant="outline" onClick={() => window.print()}>
               <BarChart3 className="h-4 w-4 mr-2" />
-              Generate Report
+              Generate Summary
             </Button>
             <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
@@ -210,7 +196,7 @@ export default function EmployerReportsPage() {
                 <FileText className="h-8 w-8 text-blue-600" />
                 <div>
                   <div className="text-2xl font-bold text-gray-900">{reports.length}</div>
-                  <p className="text-sm text-gray-600">Total Reports</p>
+                  <p className="text-sm text-gray-600">Team Reports</p>
                 </div>
               </div>
             </CardContent>
@@ -223,11 +209,11 @@ export default function EmployerReportsPage() {
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
                     {reports.length > 0 
-                      ? Math.round(reports.reduce((sum, report) => sum + report.overall_wellness, 0) / reports.length)
+                      ? Math.round(reports.reduce((sum, report) => sum + report.overall_wellness, 0) / reports.length * 10) / 10
                       : 0
                     }/10
                   </div>
-                  <p className="text-sm text-gray-600">Avg Wellness</p>
+                  <p className="text-sm text-gray-600">Avg Team Wellness</p>
                 </div>
               </div>
             </CardContent>
@@ -250,17 +236,12 @@ export default function EmployerReportsPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
-                <Calendar className="h-8 w-8 text-purple-600" />
+                <Users className="h-8 w-8 text-purple-600" />
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {reports.filter(r => {
-                      const reportDate = new Date(r.created_at);
-                      const weekAgo = new Date();
-                      weekAgo.setDate(weekAgo.getDate() - 7);
-                      return reportDate >= weekAgo;
-                    }).length}
+                    {teamMembers.length}
                   </div>
-                  <p className="text-sm text-gray-600">This Week</p>
+                  <p className="text-sm text-gray-600">Team Members</p>
                 </div>
               </div>
             </CardContent>
@@ -294,14 +275,16 @@ export default function EmployerReportsPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+              <Select value={filterEmployee} onValueChange={setFilterEmployee}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Filter by department" />
+                  <SelectValue placeholder="Filter by employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map(dept => (
-                    <SelectItem key={dept} value={dept!}>{dept}</SelectItem>
+                  <SelectItem value="all">All Team Members</SelectItem>
+                  {teamMembers.map(member => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.first_name} {member.last_name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -336,28 +319,27 @@ export default function EmployerReportsPage() {
                 <CardContent className="p-6">
                   <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4">
                     <div className="flex items-center space-x-4 mb-4 lg:mb-0">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-blue-100 text-blue-700">
+                          {report.employee?.first_name?.[0]}{report.employee?.last_name?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {report.employee ? `${report.employee.first_name} ${report.employee.last_name}` : 'Employee Report'}
+                          {report.employee ? `${report.employee.first_name} ${report.employee.last_name}` : 'Team Member'}
                         </h3>
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          <span>{report.employee?.position || 'Employee'}</span>
                           <span>
                             {new Date(report.created_at).toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
+                              weekday: 'short',
+                              month: 'short',
                               day: 'numeric'
                             })}
                           </span>
-                          <span>
-                            {new Date(report.created_at).toLocaleTimeString('en-US', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                          {report.employee?.department && (
-                            <Badge variant="outline">{report.employee.department}</Badge>
-                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {report.session_type === 'voice' ? 'Voice Session' : 'Text Session'}
+                          </Badge>
                         </div>
                       </div>
                     </div>
@@ -370,11 +352,10 @@ export default function EmployerReportsPage() {
                         </div>
                         <div className="text-sm text-gray-600">Overall Wellness</div>
                       </div>
-                      <Link href={`/employer/reports/${report.id}`}>
-                        <Button variant="outline" size="sm">
-                          View Details
-                        </Button>
-                      </Link>
+                      <Button variant="outline" size="sm">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View Details
+                      </Button>
                     </div>
                   </div>
 
@@ -409,26 +390,6 @@ export default function EmployerReportsPage() {
                     </div>
                   </div>
 
-                  {/* Additional Metrics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="text-center p-2 bg-gray-50 rounded">
-                      <div className="text-sm font-medium text-gray-700">{report.work_life_balance}/10</div>
-                      <div className="text-xs text-gray-600">Work-Life Balance</div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-50 rounded">
-                      <div className="text-sm font-medium text-gray-700">{report.anxiety_level}/10</div>
-                      <div className="text-xs text-gray-600">Anxiety</div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-50 rounded">
-                      <div className="text-sm font-medium text-gray-700">{report.confidence_level}/10</div>
-                      <div className="text-xs text-gray-600">Confidence</div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-50 rounded">
-                      <div className="text-sm font-medium text-gray-700">{report.sleep_quality}/10</div>
-                      <div className="text-xs text-gray-600">Sleep Quality</div>
-                    </div>
-                  </div>
-
                   {/* AI Analysis */}
                   {report.ai_analysis && (
                     <div className="mt-4 p-4 bg-blue-50 rounded-lg">
@@ -437,15 +398,20 @@ export default function EmployerReportsPage() {
                     </div>
                   )}
 
-                  {/* Note: Comments are not shown to maintain employee privacy */}
-                  {report.comments && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Employee Feedback:</h4>
-                      <p className="text-sm text-gray-600 italic">
-                        [Personal comments are kept confidential for employee privacy]
-                      </p>
+                  {/* Manager Actions */}
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-xs text-gray-500">
+                      Session Duration: {Math.floor((report.session_duration || 0) / 60)}m {(report.session_duration || 0) % 60}s
                     </div>
-                  )}
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm">
+                        Schedule Check-in
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        Send Resources
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -454,27 +420,50 @@ export default function EmployerReportsPage() {
           <Card>
             <CardContent className="p-12 text-center">
               <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Reports Found</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Reports Found</h3>
               <p className="text-gray-600 mb-6">
-                {searchTerm || filterRisk !== 'all' || filterDepartment !== 'all'
+                {searchTerm || filterRisk !== 'all' || filterEmployee !== 'all'
                   ? 'No reports match your current filters. Try adjusting your search criteria.'
-                  : 'No wellness reports have been submitted yet. Encourage your team to start tracking their wellness!'
+                  : 'Your team members haven\'t submitted any wellness reports yet. Encourage them to start tracking their wellness!'
                 }
               </p>
+              <Button variant="outline">
+                <Users className="h-4 w-4 mr-2" />
+                View Team Members
+              </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Privacy Notice */}
+        {/* Manager Guidelines */}
         <Card className="mt-8">
-          <CardContent className="p-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Privacy & Confidentiality</h3>
-            <div className="text-sm text-gray-600 space-y-2">
-              <p>• Employee wellness reports are visible to authorized managers and HR personnel</p>
-              <p>• Personal comments and sensitive information are kept confidential when marked as private</p>
-              <p>• Data is used to provide appropriate support and improve workplace wellness programs</p>
-              <p>• All wellness data is handled in accordance with company privacy policies</p>
-              <p>• All data is encrypted and stored securely in compliance with privacy regulations</p>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Shield className="h-5 w-5" />
+              <span>Manager Guidelines</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600">
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">When to Take Action:</h4>
+                <ul className="space-y-1">
+                  <li>• High risk employees need immediate attention</li>
+                  <li>• Declining wellness trends over multiple reports</li>
+                  <li>• Stress levels consistently above 7/10</li>
+                  <li>• Work satisfaction below 5/10</li>
+                </ul>
+              </div>
+              
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Recommended Actions:</h4>
+                <ul className="space-y-1">
+                  <li>• Schedule one-on-one check-ins</li>
+                  <li>• Provide mental health resources</li>
+                  <li>• Adjust workload if necessary</li>
+                  <li>• Connect with HR for additional support</li>
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -342,8 +342,8 @@ export default function NewReportPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">Please sign in to create a wellness report.</p>
-          <Link href="/auth/signin">
-            <Button>Sign In</Button>
+          <Link href="/">
+            <Button>Go Home</Button>
           </Link>
         </div>
       </div>

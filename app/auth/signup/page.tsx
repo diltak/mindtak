@@ -1,106 +1,146 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Brain, Eye, EyeOff } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  Brain, 
+  ArrowLeft,
+  Mail,
+  Lock,
+  User,
+  Building,
+  Eye,
+  EyeOff,
+  Loader2
+} from 'lucide-react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { toast } from 'sonner';
-import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
 
 export default function SignUpPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState<'employee' | 'employer'>('employee');
-  const [department, setDepartment] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    role: 'employer', // Fixed to employer only
+    companyName: '',
+    companySize: '',
+    industry: ''
+  });
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (error) setError('');
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    if (password !== confirmPassword) {
+    // Validation
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.companyName) {
+      setError('Please fill in all required fields');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
 
-    if (password.length < 6) {
+    if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');
       setLoading(false);
       return;
     }
 
-    let userCredential;
+    if (!formData.email.includes('@')) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Sign up the user
-      userCredential = await createUserWithEmailAndPassword(auth, email, password
+      // Create user account
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
       );
 
-      const user = userCredential.user;
-      let companyRef = null;
-
-      // If employer, create company first
-      if (role === 'employer' && companyName) {
-        const companyDocRef = await addDoc(collection(db, 'companies'), {
-          name: companyName,
-          // Add other company details here if needed
+      if (userCredential.user) {
+        // Generate unique company ID
+        const companyId = `company_${userCredential.user.uid}`;
+        
+        // Create company document
+        await setDoc(doc(db, 'companies', companyId), {
+          id: companyId,
+          name: formData.companyName,
+          size: formData.companySize || 'Not specified',
+          industry: formData.industry || 'Not specified',
+          owner_id: userCredential.user.uid,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
-        companyRef = companyDocRef;
-      }
 
-      // Send email verification
-      if (user && !user.emailVerified) {
-        await sendEmailVerification(user);
-        toast.info('Verification email sent. Please check your inbox.');
-      }
+        // Create employer user profile in Firestore
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          id: userCredential.user.uid,
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          role: 'employer',
+          company_id: companyId,
+          company_name: formData.companyName,
+          company_size: formData.companySize || 'Not specified',
+          industry: formData.industry || 'Not specified',
+          is_active: true,
+          hierarchy_level: 0, // CEO/Owner level
+          can_view_team_reports: true,
+          can_manage_employees: true,
+          can_approve_leaves: true,
+          is_department_head: true,
+          skip_level_access: true,
+          direct_reports: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
 
-      // Create user profile in Firestore
-      await setDoc(doc(db, 'users', user.uid), {
-        email: user.email || email, // Use email from form if user.email is null
-        role,
-        first_name: firstName,
-        last_name: lastName,
-        department: role === 'employee' ? department || null : null,
-        company_id: role === 'employer' && companyRef ? companyRef.id : null,
-      });
-
-      toast.success('Account created successfully!');
-      
-      // Redirect based on role
-      if (role === 'employer') {
+        toast.success('Company account created successfully!');
         router.push('/employer/dashboard');
-      } else {
-        router.push('/employee/dashboard');
       }
-    } catch (err: any) { // Explicitly typing error as 'any' for now
-      // Handle specific Firebase Auth errors
-      if (err.code === 'auth/email-already-in-use') {
-        setError('The email address is already in use by another account.');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('The email address is not valid.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Email/password accounts are not enabled. Enable email/password in the Firebase console.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('The password is too weak.');
-      } else {
-        setError(err.message || 'An unexpected error occurred.');
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          setError('An account with this email already exists.');
+          break;
+        case 'auth/invalid-email':
+          setError('Invalid email address format.');
+          break;
+        case 'auth/weak-password':
+          setError('Password is too weak. Please choose a stronger password.');
+          break;
+        default:
+          setError('Failed to create account. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -108,22 +148,34 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+      {/* Header */}
+      <header className="border-b bg-white/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <Link href="/" className="flex items-center space-x-2">
+              <Brain className="h-8 w-8 text-blue-600" />
+              <span className="text-2xl font-bold text-gray-900">Mind-DiLTak</span>
+            </Link>
+            <Link href="/">
+              <Button variant="ghost" className="flex items-center space-x-2">
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back to Home</span>
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2 text-2xl font-bold text-gray-900">
-            <Brain className="h-8 w-8 text-blue-600" />
-            <span>Mind-DiLTak</span>
-          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Employer Account</h1>
+          <p className="text-gray-600">Register your company to start managing employee wellness</p>
         </div>
 
         <Card>
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Create your account</CardTitle>
-            <CardDescription className="text-center">
-              Get started with Mind-DiLTak
-            </CardDescription>
+          <CardHeader>
+            <CardTitle className="text-center">Register Your Company</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSignUp} className="space-y-4">
@@ -135,141 +187,162 @@ export default function SignUpPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName">First Name *</Label>
                   <Input
                     id="firstName"
                     placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    value={formData.firstName}
+                    onChange={(e) => handleInputChange('firstName', e.target.value)}
+                    disabled={loading}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName">Last Name *</Label>
                   <Input
                     id="lastName"
                     placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
+                    value={formData.lastName}
+                    onChange={(e) => handleInputChange('lastName', e.target.value)}
+                    disabled={loading}
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email Address *</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="john.doe@company.com"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className="pl-10"
+                    disabled={loading}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name *</Label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    id="companyName"
+                    placeholder="Acme Corporation"
+                    value={formData.companyName}
+                    onChange={(e) => handleInputChange('companyName', e.target.value)}
+                    className="pl-10"
+                    disabled={loading}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="companySize">Company Size</Label>
+                  <Select value={formData.companySize} onValueChange={(value) => handleInputChange('companySize', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1-10">1-10 employees</SelectItem>
+                      <SelectItem value="11-50">11-50 employees</SelectItem>
+                      <SelectItem value="51-200">51-200 employees</SelectItem>
+                      <SelectItem value="201-500">201-500 employees</SelectItem>
+                      <SelectItem value="500+">500+ employees</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="industry">Industry</Label>
+                  <Select value={formData.industry} onValueChange={(value) => handleInputChange('industry', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select industry" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Technology">Technology</SelectItem>
+                      <SelectItem value="Healthcare">Healthcare</SelectItem>
+                      <SelectItem value="Finance">Finance</SelectItem>
+                      <SelectItem value="Education">Education</SelectItem>
+                      <SelectItem value="Manufacturing">Manufacturing</SelectItem>
+                      <SelectItem value="Retail">Retail</SelectItem>
+                      <SelectItem value="Consulting">Consulting</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password *</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter password (min 6 characters)"
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className="pl-10 pr-10"
+                    disabled={loading}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password *</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                  disabled={loading}
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={(value: 'employee' | 'employer') => setRole(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="employer">Employer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {role === 'employer' && (
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Company Name</Label>
-                  <Input
-                    id="companyName"
-                    placeholder="Your Company"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
-
-              {role === 'employee' && (
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department (Optional)</Label>
-                  <Input
-                    id="department"
-                    placeholder="Engineering, Marketing, etc."
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm your password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Creating account...' : 'Create Account'}
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  'Create Account'
+                )}
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm">
-              <span className="text-gray-600">Already have an account? </span>
-              <Link href="/auth/signin" className="text-blue-600 hover:underline">
-                Sign in
-              </Link>
+            <div className="mt-6 space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">After Registration</h4>
+                <p className="text-sm text-blue-700">
+                  Once your company account is created, you can add employees through the Employee Management section in your dashboard.
+                </p>
+              </div>
+              
+              <div className="text-center text-sm">
+                <span className="text-gray-600">Already have an account? </span>
+                <Link href="/auth/login" className="text-blue-600 hover:underline">
+                  Sign in
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>

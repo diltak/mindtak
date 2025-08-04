@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Navbar } from '@/components/shared/navbar';
@@ -9,29 +9,66 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, UserPlus, Mail, User, Building } from 'lucide-react';
+import { ArrowLeft, UserPlus, Mail, User, Building, Users, Shield, Crown } from 'lucide-react';
 import { auth, db } from '@/lib/firebase'; // Import Firebase auth and db
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, doc, setDoc } from 'firebase/firestore'; // Import Firestore functions
+import { collection, doc, setDoc, query, where, getDocs } from 'firebase/firestore'; // Import Firestore functions
 import { useUser } from '@/hooks/use-user';
+import { updateReportingChain } from '@/lib/hierarchy-service';
 import { toast } from 'sonner';
 export default function NewEmployeePage() {
   const { user } = useUser();
   const router = useRouter();
 
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Fetch potential managers on component mount
+  useEffect(() => {
+    const fetchManagers = async () => {
+      if (!user?.company_id) return;
+      
+      try {
+        const managersRef = collection(db, 'users');
+        const managersQuery = query(
+          managersRef,
+          where('company_id', '==', user.company_id),
+          where('is_active', '==', true)
+        );
+        const managersSnapshot = await getDocs(managersQuery);
+        const managersData = managersSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(u => u.role === 'manager' || u.role === 'hr' || u.role === 'admin' || u.role === 'employer');
+        
+        setManagers(managersData);
+      } catch (error) {
+        console.error('Error fetching managers:', error);
+      }
+    };
+
+    fetchManagers();
+  }, [user?.company_id]);
 
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
     lastName: '',
     department: '',
+    position: '',
+    managerId: '',
+    hierarchyLevel: '4', // Default to individual contributor
     password: '',
     confirmPassword: '',
+    canViewTeamReports: false,
+    canApproveLeaves: false,
+    canManageEmployees: false,
+    isDepartmentHead: false,
+    skipLevelAccess: false,
   });
+
+  const [managers, setManagers] = useState<any[]>([]);
 
   const departments = [
     'Engineering',
@@ -47,8 +84,21 @@ export default function NewEmployeePage() {
     'Other'
   ];
 
+  const hierarchyLevels = [
+    { value: '0', label: 'Executive (CEO, President)', icon: Crown },
+    { value: '1', label: 'Senior Management (VP, SVP)', icon: Crown },
+    { value: '2', label: 'Middle Management (Director)', icon: Shield },
+    { value: '3', label: 'Team Lead (Manager)', icon: Users },
+    { value: '4', label: 'Individual Contributor', icon: User },
+  ];
+
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => ({ 
+      ...prev, 
+      [field]: field.startsWith('can') || field.startsWith('is') || field === 'skipLevelAccess' 
+        ? value === 'true' 
+        : value 
+    }));
   };
 
   const generateRandomPassword = () => {
@@ -100,25 +150,50 @@ export default function NewEmployeePage() {
       const firebaseUser = userCredential.user;
 
       if (firebaseUser) {
-        // Create user profile
-        const userDocRef = doc(collection(db, 'users'), firebaseUser.uid); // Assuming db is imported from '@/lib/firebase'
+        // Determine role based on hierarchy level and permissions
+        let role = 'employee';
+        const hierarchyLevel = parseInt(formData.hierarchyLevel);
+        if (hierarchyLevel <= 2 || formData.canManageEmployees) {
+          role = 'manager';
+        }
+
+        // Create user profile with hierarchy data
+        const userDocRef = doc(collection(db, 'users'), firebaseUser.uid);
         await setDoc(userDocRef, {
-          id: firebaseUser.uid, // Use Firebase Auth UID as document ID and id field
+          id: firebaseUser.uid,
           email: formData.email,
-          role: 'employee',
+          role: role,
           first_name: formData.firstName,
           last_name: formData.lastName,
           department: formData.department || '',
+          position: formData.position || '',
           company_id: user.company_id,
+          manager_id: formData.managerId && formData.managerId !== 'none' ? formData.managerId : null,
+          hierarchy_level: hierarchyLevel,
+          is_department_head: formData.isDepartmentHead,
+          can_view_team_reports: formData.canViewTeamReports,
+          can_approve_leaves: formData.canApproveLeaves,
+          can_manage_employees: formData.canManageEmployees,
+          skip_level_access: formData.skipLevelAccess,
+          direct_reports: [],
+          reporting_chain: [],
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
 
-        toast.success('Employee added successfully!');
+        // Update reporting chain if manager is assigned
+        if (formData.managerId && formData.managerId !== 'none') {
+          await updateReportingChain(firebaseUser.uid, formData.managerId);
+        }
+
+        toast.success('Employee added successfully with hierarchy setup!');
         router.push('/employer/employees');
       } else {
         setError('Failed to create employee profile');
       }
-    } catch (err) {
-      setError('An unexpected error occurred');
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred');
       console.error('Error:', err);
     } finally {
       setLoading(false);
@@ -130,8 +205,8 @@ export default function NewEmployeePage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">Please sign in to add employees.</p>
-          <Link href="/auth/signin">
-            <Button>Sign In</Button>
+          <Link href="/">
+            <Button>Go Home</Button>
           </Link>
         </div>
       </div>
@@ -237,18 +312,146 @@ export default function NewEmployeePage() {
                   <span>Work Information</span>
                 </h3>
 
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
-                  <Select value={formData.department} onValueChange={(value) => handleInputChange('department', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map(dept => (
-                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department</Label>
+                    <Select value={formData.department} onValueChange={(value) => handleInputChange('department', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map(dept => (
+                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="position">Position/Title</Label>
+                    <Input
+                      id="position"
+                      placeholder="Software Engineer"
+                      value={formData.position}
+                      onChange={(e) => handleInputChange('position', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Hierarchy Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 flex items-center space-x-2">
+                  <Users className="h-5 w-5" />
+                  <span>Hierarchy & Reporting</span>
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="hierarchyLevel">Hierarchy Level</Label>
+                    <Select value={formData.hierarchyLevel} onValueChange={(value) => handleInputChange('hierarchyLevel', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select hierarchy level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hierarchyLevels.map(level => {
+                          const IconComponent = level.icon;
+                          return (
+                            <SelectItem key={level.value} value={level.value}>
+                              <div className="flex items-center space-x-2">
+                                <IconComponent className="h-4 w-4" />
+                                <span>{level.label}</span>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="managerId">Reports To (Manager)</Label>
+                    <Select value={formData.managerId} onValueChange={(value) => handleInputChange('managerId', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select manager (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Manager</SelectItem>
+                        {managers.map(manager => (
+                          <SelectItem key={manager.id} value={manager.id}>
+                            {manager.first_name} {manager.last_name} - {manager.role}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Permissions */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-800">Permissions & Responsibilities</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="isDepartmentHead">Department Head</Label>
+                        <p className="text-sm text-gray-500">Can oversee entire department</p>
+                      </div>
+                      <Switch
+                        id="isDepartmentHead"
+                        checked={formData.isDepartmentHead}
+                        onCheckedChange={(checked) => handleInputChange('isDepartmentHead', checked.toString())}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="canViewTeamReports">View Team Reports</Label>
+                        <p className="text-sm text-gray-500">Access team wellness reports</p>
+                      </div>
+                      <Switch
+                        id="canViewTeamReports"
+                        checked={formData.canViewTeamReports}
+                        onCheckedChange={(checked) => handleInputChange('canViewTeamReports', checked.toString())}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="canApproveLeaves">Approve Leaves</Label>
+                        <p className="text-sm text-gray-500">Can approve time-off requests</p>
+                      </div>
+                      <Switch
+                        id="canApproveLeaves"
+                        checked={formData.canApproveLeaves}
+                        onCheckedChange={(checked) => handleInputChange('canApproveLeaves', checked.toString())}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="canManageEmployees">Manage Employees</Label>
+                        <p className="text-sm text-gray-500">Can add/edit team members</p>
+                      </div>
+                      <Switch
+                        id="canManageEmployees"
+                        checked={formData.canManageEmployees}
+                        onCheckedChange={(checked) => handleInputChange('canManageEmployees', checked.toString())}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between md:col-span-2">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="skipLevelAccess">Skip-Level Access</Label>
+                        <p className="text-sm text-gray-500">Can view reports of subordinates' teams</p>
+                      </div>
+                      <Switch
+                        id="skipLevelAccess"
+                        checked={formData.skipLevelAccess}
+                        onCheckedChange={(checked) => handleInputChange('skipLevelAccess', checked.toString())}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -19,8 +19,8 @@ export default function ContactPage() {
               <span className="text-2xl font-bold text-gray-900">Mind-DiLTak</span>
             </Link>
             <div className="flex items-center space-x-4">
-              <Link href="/auth/signin">
-                <Button variant="ghost">Sign In</Button>
+              <Link href="/">
+                <Button variant="ghost">Home</Button>
               </Link>
               <Link href="/auth/signup">
                 <Button>Get Started</Button>

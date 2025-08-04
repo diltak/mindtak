@@ -3,7 +3,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'employee' | 'hr' | 'admin' | 'employer';
+  role: 'employee' | 'hr' | 'admin' | 'employer' | 'manager';
   company_id?: string;
   department?: string;
   position?: string;
@@ -21,6 +21,15 @@ export interface User {
   employee_id?: string;
   manager_id?: string;
   hire_date?: string;
+  // Hierarchy fields
+  hierarchy_level?: number; // 0=CEO, 1=VP, 2=Director, 3=Manager, 4=Employee
+  reporting_chain?: string[]; // Array of manager IDs from top to direct manager
+  direct_reports?: string[]; // Array of direct subordinate IDs
+  is_department_head?: boolean;
+  can_approve_leaves?: boolean;
+  can_view_team_reports?: boolean;
+  can_manage_employees?: boolean;
+  skip_level_access?: boolean; // Can view reports of subordinates' subordinates
 }
 
 export interface Company {
@@ -160,4 +169,68 @@ export interface ToastProps {
   action?: React.ReactNode;
   variant?: 'default' | 'destructive';
   duration?: number;
+}
+
+// Hierarchy-specific interfaces
+export interface Department {
+  id: string;
+  name: string;
+  company_id: string;
+  parent_department_id?: string;
+  department_head_id?: string;
+  hierarchy_path: string[]; // Array of parent department IDs
+  budget_code?: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HierarchyNode {
+  user: User;
+  children: HierarchyNode[];
+  level: number;
+  isExpanded?: boolean;
+}
+
+export interface TeamStats {
+  team_size: number;
+  direct_reports: number;
+  total_subordinates: number;
+  avg_team_wellness: number;
+  high_risk_team_members: number;
+  team_departments: string[];
+  recent_reports_count: number;
+}
+
+export interface ManagerPermissions {
+  can_view_direct_reports: boolean;
+  can_view_team_reports: boolean;
+  can_view_subordinate_teams: boolean;
+  can_approve_leaves: boolean;
+  can_manage_team_members: boolean;
+  can_access_analytics: boolean;
+  hierarchy_access_level: number; // How many levels down they can access
+}
+
+export interface HierarchyAnalytics {
+  team_wellness_comparison: {
+    team_name: string;
+    manager_name: string;
+    avg_wellness: number;
+    team_size: number;
+    high_risk_count: number;
+  }[];
+  department_performance: {
+    department: string;
+    avg_wellness: number;
+    employee_count: number;
+    manager_count: number;
+  }[];
+  hierarchy_health: {
+    level: number;
+    level_name: string;
+    avg_wellness: number;
+    employee_count: number;
+  }[];
 }

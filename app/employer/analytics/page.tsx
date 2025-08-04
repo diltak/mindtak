@@ -93,13 +93,13 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (!userLoading && !user) {
-      router.push('/auth/signin');
+      router.push('/');
       return;
     }
 
     if (user?.role !== 'employer') {
       toast.error('Access denied. Employer role required.');
-      // router.push('/auth/signin')//;
+      router.push('/');
       return;
     }
 

@@ -50,7 +50,7 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     if (!userLoading && !user) {
-      router.push('/auth/signin');
+      router.push('/');
       return;
     }
 
@@ -360,9 +360,11 @@ export default function EmployeesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
+                        <DropdownMenuItem asChild>
+                          <Link href={`/employer/employees/${employee.id}`}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem>
                           <Edit className="h-4 w-4 mr-2" />

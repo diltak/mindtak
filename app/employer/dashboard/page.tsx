@@ -105,13 +105,13 @@ export default function EmployerDashboardPage() {
 
   useEffect(() => {
     if (!userLoading && !user) {
-      router.push('/auth/signin');
+      router.push('/');
       return;
     }
 
     if (user && user.role !== 'employer') {
       toast.error('Access denied. Employer role required.');
-      router.push('/auth/signin');
+      router.push('/');
       return;
     }
 
@@ -1455,7 +1455,7 @@ export default function EmployerDashboardPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => router.push(`/employer/employee/${employee.id}`)}
+                                onClick={() => router.push(`/employer/employees/${employee.id}`)}
                               >
                                 View Details
                               </Button>

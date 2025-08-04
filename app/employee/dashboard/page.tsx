@@ -39,7 +39,7 @@ export default function EmployeeDashboard() {
 
   useEffect(() => {
     if (!userLoading && !user) {
-      router.push('/auth/signin');
+      router.push('/');
       return;
     }
 

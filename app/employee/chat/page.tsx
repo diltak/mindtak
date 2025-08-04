@@ -183,9 +183,12 @@ export default function EmployeeChatPage() {
   const callTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!userLoading && !user) {
-      router.push('/auth/signin');
-      return;
+    // Allow demo access without authentication
+    if (!userLoading) {
+      if (!user) {
+        // Demo mode - continue without user
+        console.log('Demo mode: No authentication required');
+      }
     }
     if (user) {
       initializeChat();
@@ -771,9 +774,9 @@ export default function EmployeeChatPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: messageHistoryForApi,
-
-
-          sessionType: isVoiceMode ? 'voice' : 'text'
+          sessionType: isVoiceMode ? 'voice' : 'text',
+          userId: user?.id,
+          companyId: user?.company_id
         }),
       });
 
@@ -831,7 +834,9 @@ export default function EmployeeChatPage() {
           messages,
           endSession: true,
           sessionType: isVoiceMode ? 'voice' : 'text',
-          sessionDuration: callDuration || Math.floor((Date.now() - (callStartTime?.getTime() || Date.now())) / 1000)
+          sessionDuration: callDuration || Math.floor((Date.now() - (callStartTime?.getTime() || Date.now())) / 1000),
+          userId: user?.id,
+          companyId: user?.company_id
         }),
       });
 
@@ -1054,8 +1059,8 @@ export default function EmployeeChatPage() {
                     </AvatarFallback>
                   </Avatar>
                   <div className={`rounded-lg px-4 py-2 text-sm ${message.sender === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white text-gray-800 border'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-800 border'
                     }`}>
                     {message.sender === 'ai' ? (
 
@@ -1186,37 +1191,34 @@ export default function EmployeeChatPage() {
                 {/* Central Glowing Circle */}
                 <div className="relative mb-12">
                   {/* Outer glow rings */}
-                  <div className={`absolute inset-0 rounded-full ${
-                    isRecording 
-                      ? 'animate-ping bg-red-400/30' 
-                      : isSpeaking 
-                        ? 'animate-pulse bg-green-400/30' 
-                        : processingAudio 
-                          ? 'animate-spin bg-yellow-400/30' 
-                          : 'animate-pulse bg-blue-400/30'
-                  } scale-150`}></div>
-                  
-                  <div className={`absolute inset-0 rounded-full ${
-                    isRecording 
-                      ? 'animate-pulse bg-red-400/20' 
-                      : isSpeaking 
-                        ? 'animate-pulse bg-green-400/20' 
-                        : processingAudio 
-                          ? 'animate-pulse bg-yellow-400/20' 
-                          : 'animate-pulse bg-blue-400/20'
-                  } scale-125`}></div>
+                  <div className={`absolute inset-0 rounded-full ${isRecording
+                    ? 'animate-ping bg-red-400/30'
+                    : isSpeaking
+                      ? 'animate-pulse bg-green-400/30'
+                      : processingAudio
+                        ? 'animate-spin bg-yellow-400/30'
+                        : 'animate-pulse bg-blue-400/30'
+                    } scale-150`}></div>
+
+                  <div className={`absolute inset-0 rounded-full ${isRecording
+                    ? 'animate-pulse bg-red-400/20'
+                    : isSpeaking
+                      ? 'animate-pulse bg-green-400/20'
+                      : processingAudio
+                        ? 'animate-pulse bg-yellow-400/20'
+                        : 'animate-pulse bg-blue-400/20'
+                    } scale-125`}></div>
 
                   {/* Main circle */}
-                  <div className={`relative w-64 h-64 rounded-full border-4 ${
-                    isRecording 
-                      ? 'border-red-400 bg-red-500/20 shadow-red-400/50' 
-                      : isSpeaking 
-                        ? 'border-green-400 bg-green-500/20 shadow-green-400/50' 
-                        : processingAudio 
-                          ? 'border-yellow-400 bg-yellow-500/20 shadow-yellow-400/50' 
-                          : 'border-blue-400 bg-blue-500/20 shadow-blue-400/50'
-                  } shadow-2xl backdrop-blur-sm flex items-center justify-center transition-all duration-300`}>
-                    
+                  <div className={`relative w-64 h-64 rounded-full border-4 ${isRecording
+                    ? 'border-red-400 bg-red-500/20 shadow-red-400/50'
+                    : isSpeaking
+                      ? 'border-green-400 bg-green-500/20 shadow-green-400/50'
+                      : processingAudio
+                        ? 'border-yellow-400 bg-yellow-500/20 shadow-yellow-400/50'
+                        : 'border-blue-400 bg-blue-500/20 shadow-blue-400/50'
+                    } shadow-2xl backdrop-blur-sm flex items-center justify-center transition-all duration-300`}>
+
                     {/* Inner content */}
                     <div className="text-center">
                       {isRecording && (
@@ -1226,7 +1228,7 @@ export default function EmployeeChatPage() {
                           <p className="text-sm text-red-200 mt-2">Speak naturally</p>
                         </>
                       )}
-                      
+
                       {isSpeaking && (
                         <>
                           <Volume2 className="w-16 h-16 mx-auto mb-4 text-green-400 animate-pulse" />
@@ -1240,7 +1242,7 @@ export default function EmployeeChatPage() {
                           </div>
                         </>
                       )}
-                      
+
                       {processingAudio && (
                         <>
                           <Loader2 className="w-16 h-16 mx-auto mb-4 text-yellow-400 animate-spin" />
@@ -1248,7 +1250,7 @@ export default function EmployeeChatPage() {
                           <p className="text-sm text-yellow-200 mt-2">Understanding your message</p>
                         </>
                       )}
-                      
+
                       {!isRecording && !isSpeaking && !processingAudio && (
                         <>
                           <Bot className="w-16 h-16 mx-auto mb-4 text-blue-400" />
@@ -1282,11 +1284,10 @@ export default function EmployeeChatPage() {
                   <button
                     onClick={isRecording ? stopRecording : startRecording}
                     disabled={processingAudio || isSpeaking}
-                    className={`w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
-                      isRecording
-                        ? 'bg-red-500 border-red-400 hover:bg-red-600 shadow-red-400/50'
-                        : 'bg-white/10 border-white/30 hover:bg-white/20 hover:border-white/50'
-                    } shadow-lg backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${isRecording
+                      ? 'bg-red-500 border-red-400 hover:bg-red-600 shadow-red-400/50'
+                      : 'bg-white/10 border-white/30 hover:bg-white/20 hover:border-white/50'
+                      } shadow-lg backdrop-blur-sm disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {isRecording ? (
                       <Square className="w-6 h-6 text-white" />
