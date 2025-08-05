@@ -174,7 +174,7 @@ export async function getTeamStats(managerId: string): Promise<TeamStats> {
     const highRiskMembers = recentReports.filter(report => report.risk_level === 'high').length;
     
     // Get unique departments
-    const teamDepartments = [...new Set(allSubordinates.map(emp => emp.department).filter(Boolean))];
+    const teamDepartments = [...new Set(allSubordinates.map(emp => emp.department).filter((dept): dept is string => Boolean(dept)))];
     
     return {
       team_size: allSubordinates.length,
@@ -306,7 +306,7 @@ export async function getHierarchyAnalytics(companyId: string): Promise<Hierarch
     );
     
     // Department performance
-    const departments = [...new Set(allUsers.map(user => user.department).filter(Boolean))];
+    const departments = [...new Set(allUsers.map(user => user.department).filter((dept): dept is string => Boolean(dept)))];
     const departmentPerformance = departments.map(dept => {
       const deptEmployees = allUsers.filter(user => user.department === dept);
       const deptReports = recentReports.filter(report => {

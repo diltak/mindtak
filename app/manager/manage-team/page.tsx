@@ -67,7 +67,7 @@ export default function ManageTeamPage() {
     }
   };
 
-  const departments = [...new Set(teamMembers.map(member => member.department).filter(Boolean))];
+  const departments = [...new Set(teamMembers.map(member => member.department).filter((dept): dept is string => Boolean(dept)))];
 
   const filteredMembers = teamMembers.filter(member => {
     const matchesSearch = searchTerm === '' || 

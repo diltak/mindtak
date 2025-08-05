@@ -125,7 +125,7 @@ export default function EmployerReportsPage() {
     );
   };
 
-  const departments = Array.from(new Set(reports.map(report => report.employee?.department).filter(Boolean)));
+  const departments = Array.from(new Set(reports.map(report => report.employee?.department).filter((dept): dept is string => Boolean(dept))));
 
   const filteredReports = reports.filter(report => {
     const matchesSearch = searchTerm === '' || 

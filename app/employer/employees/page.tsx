@@ -174,7 +174,7 @@ export default function EmployeesPage() {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
-  const departments = Array.from(new Set(employees.map(emp => emp.department).filter(Boolean)));
+  const departments = Array.from(new Set(employees.map(emp => emp.department).filter((dept): dept is string => Boolean(dept))));
 
   const filteredEmployees = employees.filter(employee => {
     const matchesSearch = searchTerm === '' ||

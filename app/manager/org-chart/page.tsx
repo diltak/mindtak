@@ -218,7 +218,7 @@ export default function OrgChartPage() {
                 <Building className="h-8 w-8 text-purple-600" />
                 <div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {[...new Set(hierarchy.map(node => node.user.department).filter(Boolean))].length}
+                    {[...new Set(hierarchy.map(node => node.user.department).filter((dept): dept is string => Boolean(dept)))].length}
                   </div>
                   <p className="text-sm text-gray-600">Departments</p>
                 </div>
