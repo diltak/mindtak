@@ -11,13 +11,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, UserPlus, Mail, User, Building, Users, Shield, Crown } from 'lucide-react';
+import { ArrowLeft, UserPlus, Mail, User as UserIcon, Building, Users, Shield, Crown } from 'lucide-react';
 import { auth, db } from '@/lib/firebase'; // Import Firebase auth and db
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, doc, setDoc, query, where, getDocs } from 'firebase/firestore'; // Import Firestore functions
 import { useUser } from '@/hooks/use-user';
 import { updateReportingChain } from '@/lib/hierarchy-service';
 import { toast } from 'sonner';
+import type { User } from '@/types/index';
 export default function NewEmployeePage() {
   const { user } = useUser();
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function NewEmployeePage() {
         );
         const managersSnapshot = await getDocs(managersQuery);
         const managersData = managersSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .map(doc => ({ id: doc.id, ...doc.data() } as User))
           .filter(u => u.role === 'manager' || u.role === 'hr' || u.role === 'admin' || u.role === 'employer');
         
         setManagers(managersData);
@@ -261,7 +262,7 @@ export default function NewEmployeePage() {
               {/* Personal Information */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 flex items-center space-x-2">
-                  <User className="h-5 w-5" />
+                  <UserIcon className="h-5 w-5" />
                   <span>Personal Information</span>
                 </h3>
 
