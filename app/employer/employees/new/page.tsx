@@ -90,7 +90,7 @@ export default function NewEmployeePage() {
     { value: '1', label: 'Senior Management (VP, SVP)', icon: Crown },
     { value: '2', label: 'Middle Management (Director)', icon: Shield },
     { value: '3', label: 'Team Lead (Manager)', icon: Users },
-    { value: '4', label: 'Individual Contributor', icon: User },
+    { value: '4', label: 'Individual Contributor', icon: UserIcon },
   ];
 
   const handleInputChange = (field: string, value: string) => {
