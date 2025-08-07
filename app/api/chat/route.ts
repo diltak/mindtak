@@ -70,12 +70,54 @@ async function callPerplexityAPI(messages: any[], systemPrompt: string, maxToken
     throw new Error('Perplexity API key not configured');
   }
 
+  // Format messages properly for Perplexity API
+  // Ensure alternating user/assistant pattern after system message
+  const formattedMessages = [{ role: 'system', content: systemPrompt }];
+
+  // Add conversation history, ensuring proper alternation
+  // Perplexity requires strict alternating pattern: user -> assistant -> user -> assistant
+  let lastRole = 'system';
+
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    const currentRole = message.role;
+
+    // If we have consecutive messages from the same role, we need to handle it
+    if (currentRole === lastRole && lastRole !== 'system') {
+      // Skip consecutive messages from the same role, or merge them
+      if (formattedMessages.length > 1) {
+        // Merge with the previous message of the same role
+        const lastMessage = formattedMessages[formattedMessages.length - 1];
+        lastMessage.content += '\n' + message.content;
+        continue;
+      }
+    }
+
+    // Ensure we start with a user message after system
+    if (formattedMessages.length === 1 && currentRole !== 'user') {
+      // If the first message after system is not from user, skip or convert it
+      if (currentRole === 'assistant') {
+        continue; // Skip assistant messages at the beginning
+      }
+    }
+
+    formattedMessages.push({
+      role: currentRole,
+      content: message.content
+    });
+
+    lastRole = currentRole;
+  }
+
+  // Ensure we end with a user message for Perplexity to respond to
+  if (formattedMessages.length > 1 && formattedMessages[formattedMessages.length - 1].role !== 'user') {
+    // If the last message is not from user, we might need to add a prompt
+    // But in most cases, this should not happen in a chat flow
+  }
+
   const requestBody = {
-    model: 'llama-3.1-sonar-large-128k-online',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...messages
-    ],
+    model: 'sonar',
+    messages: formattedMessages,
     max_tokens: maxTokens,
     temperature: 0.7,
     top_p: 0.9,
@@ -92,7 +134,9 @@ async function callPerplexityAPI(messages: any[], systemPrompt: string, maxToken
     url: PERPLEXITY_API_URL,
     hasApiKey: !!PERPLEXITY_API_KEY,
     apiKeyPrefix: PERPLEXITY_API_KEY?.substring(0, 10) + '...',
-    model: requestBody.model
+    model: requestBody.model,
+    messageCount: formattedMessages.length,
+    messageRoles: formattedMessages.map(m => m.role)
   });
 
   const response = await fetch(PERPLEXITY_API_URL, {
@@ -112,14 +156,14 @@ async function callPerplexityAPI(messages: any[], systemPrompt: string, maxToken
     } catch {
       errorData = { message: errorText };
     }
-    
+
     console.error('Perplexity API Error:', {
       status: response.status,
       statusText: response.statusText,
       error: errorData,
       headers: Object.fromEntries(response.headers.entries())
     });
-    
+
     throw new Error(`Perplexity API error: ${response.status} - ${errorData.error?.message || errorData.message || 'Unknown error'}`);
   }
 
@@ -166,6 +210,8 @@ async function generateChatResponse(messages: ChatMessage[], sessionType: string
       role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
       content: msg.content
     }));
+
+
 
     let systemPrompt = `You are a compassionate AI wellness assistant conducting a ${sessionType} mental health check-in. Your role is to:
 
@@ -225,15 +271,6 @@ DEEP SEARCH MODE: You have access to real-time web search capabilities. When the
           sessionType === 'voice' ? 150 : 300
         );
         aiResponse = perplexityResponse.choices[0]?.message?.content || undefined;
-
-        // Add citations if available
-        if (perplexityResponse.citations && perplexityResponse.citations.length > 0) {
-          const citations = perplexityResponse.citations
-            .slice(0, 3) // Limit to 3 citations
-            .map((citation: string, index: number) => `[${index + 1}] ${citation}`)
-            .join('\n');
-          aiResponse += `\n\n**Sources:**\n${citations}`;
-        }
       } catch (perplexityError) {
         console.error('Perplexity API failed, falling back to OpenAI:', perplexityError);
         // Fallback to OpenAI if Perplexity fails

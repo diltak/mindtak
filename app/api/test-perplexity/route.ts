@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Try a simpler request first
     const requestBody = {
-      model: 'llama-3.1-sonar-large-128k-online',
+      model: 'sonar',
       messages: [
         {
           role: 'user',
