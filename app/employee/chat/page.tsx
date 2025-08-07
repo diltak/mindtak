@@ -26,12 +26,14 @@ import {
   VolumeX,
   Square,
   Play,
-  Pause
+  Pause,
+  Search
 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
 import { toast } from 'sonner';
 import type { ChatMessage } from '@/types/index';
 import ReactMarkdown from 'react-markdown';
+import { DeepConversationToggle } from '@/components/shared/ai-provider-selector';
 
 
 import {
@@ -171,7 +173,8 @@ export default function EmployeeChatPage() {
 
   const [audioEnabled, setAudioEnabled] = useState(true);
 
-
+  // Deep Conversation state
+  const [deepConversation, setDeepConversation] = useState(false);
 
   const [processingAudio, setProcessingAudio] = useState(false);
 
@@ -689,7 +692,13 @@ export default function EmployeeChatPage() {
 
 
 
-      const welcomeMessageContent = `Hello ${user!.first_name || 'there'}! I'm your confidential AI wellness assistant. Let's chat for a few minutes about how you're doing. You can type your responses or use voice mode for a more natural conversation. How have you been feeling lately?`;
+      const welcomeMessageContent = `Hello ${user!.first_name || 'there'}! I'm your confidential AI wellness assistant. Let's chat for a few minutes about how you're doing. 
+
+You can:
+• Type your responses or use voice mode for natural conversation
+• Enable "Deep Conversation" for real-time mental health research and information
+
+How have you been feeling lately?`;
       await addMessageToDb(welcomeMessageContent, 'ai', newSessionDoc.id);
 
       // Set up real-time listener for messages
@@ -776,7 +785,9 @@ export default function EmployeeChatPage() {
           messages: messageHistoryForApi,
           sessionType: isVoiceMode ? 'voice' : 'text',
           userId: user?.id,
-          companyId: user?.company_id
+          companyId: user?.company_id,
+          deepSearch: deepConversation,
+          aiProvider: deepConversation ? 'perplexity' : 'openai'
         }),
       });
 
@@ -1049,12 +1060,23 @@ export default function EmployeeChatPage() {
             </CardTitle>
           </CardHeader>
 
+          {/* Deep Conversation Toggle */}
+          {!sessionEnded && (
+            <div className="px-4 py-2 border-b bg-gray-50/50">
+              <DeepConversationToggle
+                deepConversation={deepConversation}
+                onDeepConversationChange={setDeepConversation}
+                disabled={loading || isVoiceMode}
+              />
+            </div>
+          )}
+
           <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
             {messages.map((message) => (
               <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`flex items-start space-x-3 max-w-[85%] ${message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback>
+                    <AvatarFallback className={message.sender === 'ai' && deepConversation ? 'bg-blue-100' : ''}>
                       {message.sender === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                     </AvatarFallback>
                   </Avatar>
@@ -1063,13 +1085,21 @@ export default function EmployeeChatPage() {
                     : 'bg-white text-gray-800 border'
                     }`}>
                     {message.sender === 'ai' ? (
-
-
-
-                      <div className="prose prose-sm max-w-none">
-                        <ReactMarkdown>
-                          {message.content}
-                        </ReactMarkdown>
+                      <div>
+                        <div className="prose prose-sm max-w-none">
+                          <ReactMarkdown>
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                        {/* Deep Conversation indicator */}
+                        {deepConversation && (
+                          <div className="flex items-center justify-end mt-2 pt-2 border-t border-gray-100">
+                            <div className="flex items-center space-x-1 text-xs text-blue-600">
+                              <Search className="h-3 w-3" />
+                              <span>Deep Conversation</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p>{message.content}</p>
@@ -1089,7 +1119,12 @@ export default function EmployeeChatPage() {
                     <div className="flex space-x-1 items-center">
                       <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                       <span className="text-xs text-gray-500">
-                        {processingAudio ? 'Processing audio...' : 'AI is thinking...'}
+                        {processingAudio 
+                          ? 'Processing audio...' 
+                          : deepConversation
+                            ? 'Searching the web for latest information...'
+                            : 'AI is thinking...'
+                        }
                       </span>
                     </div>
                   </div>

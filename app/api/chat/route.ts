@@ -9,6 +9,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Perplexity AI configuration
+const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
+const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
+
 interface WellnessReport {
   mood: number;
   stress_score: number;
@@ -27,7 +31,16 @@ interface WellnessReport {
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, endSession, sessionType = 'text', sessionDuration = 0, userId, companyId } = await request.json();
+    const {
+      messages,
+      endSession,
+      sessionType = 'text',
+      sessionDuration = 0,
+      userId,
+      companyId,
+      deepSearch = false,
+      aiProvider = 'openai' // 'openai' or 'perplexity'
+    } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -39,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (endSession) {
       return await generateWellnessReport(messages, sessionType, sessionDuration);
     } else {
-      return await generateChatResponse(messages, sessionType, userId, companyId);
+      return await generateChatResponse(messages, sessionType, userId, companyId, deepSearch, aiProvider);
     }
 
   } catch (error: any) {
@@ -51,7 +64,77 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function generateChatResponse(messages: ChatMessage[], sessionType: string, userId?: string, companyId?: string) {
+// Perplexity AI API call function
+async function callPerplexityAPI(messages: any[], systemPrompt: string, maxTokens: number = 300) {
+  if (!PERPLEXITY_API_KEY) {
+    throw new Error('Perplexity API key not configured');
+  }
+
+  const requestBody = {
+    model: 'llama-3.1-sonar-large-128k-online',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages
+    ],
+    max_tokens: maxTokens,
+    temperature: 0.7,
+    top_p: 0.9,
+    search_domain_filter: ["pubmed.ncbi.nlm.nih.gov", "who.int", "mayoclinic.org", "webmd.com", "healthline.com"],
+    return_citations: true,
+    search_recency_filter: "month",
+    top_k: 0,
+    stream: false,
+    presence_penalty: 0,
+    frequency_penalty: 1
+  };
+
+  console.log('Perplexity API Request:', {
+    url: PERPLEXITY_API_URL,
+    hasApiKey: !!PERPLEXITY_API_KEY,
+    apiKeyPrefix: PERPLEXITY_API_KEY?.substring(0, 10) + '...',
+    model: requestBody.model
+  });
+
+  const response = await fetch(PERPLEXITY_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorData;
+    try {
+      errorData = JSON.parse(errorText);
+    } catch {
+      errorData = { message: errorText };
+    }
+    
+    console.error('Perplexity API Error:', {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorData,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    throw new Error(`Perplexity API error: ${response.status} - ${errorData.error?.message || errorData.message || 'Unknown error'}`);
+  }
+
+  const result = await response.json();
+  console.log('Perplexity API Success:', {
+    hasChoices: !!result.choices,
+    choicesLength: result.choices?.length,
+    hasCitations: !!result.citations,
+    citationsLength: result.citations?.length
+  });
+
+  return result;
+}
+
+async function generateChatResponse(messages: ChatMessage[], sessionType: string, userId?: string, companyId?: string, deepSearch: boolean = false, aiProvider: string = 'openai') {
   try {
     // Get company-wide reports context
     let reportsContext = '';
@@ -84,7 +167,7 @@ async function generateChatResponse(messages: ChatMessage[], sessionType: string
       content: msg.content
     }));
 
-    const systemPrompt = `You are a compassionate AI wellness assistant conducting a ${sessionType} mental health check-in. Your role is to:
+    let systemPrompt = `You are a compassionate AI wellness assistant conducting a ${sessionType} mental health check-in. Your role is to:
 
 1. Create a safe, non-judgmental space for the user to share their feelings
 2. Ask thoughtful follow-up questions to understand their mental state
@@ -124,17 +207,62 @@ Use this information to:
 
 Remember: This is a wellness check-in, not therapy. Be warm, understanding, and help them reflect on their current state. Use both personal and company context to provide the most supportive and relevant conversation possible.`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...conversationHistory
-      ],
-      temperature: 0.7,
-      max_tokens: sessionType === 'voice' ? 150 : 300,
-    });
+    // Add deep search context for Perplexity
+    if (deepSearch && aiProvider === 'perplexity') {
+      systemPrompt += `
 
-    const aiResponse = completion.choices[0]?.message?.content;
+DEEP SEARCH MODE: You have access to real-time web search capabilities. When the user asks questions about mental health topics, wellness strategies, or current research, use your web search to provide up-to-date, evidence-based information. Always cite your sources and focus on reputable health organizations and recent research.`;
+    }
+
+    let aiResponse: string | undefined;
+
+    if (aiProvider === 'perplexity' && deepSearch) {
+      try {
+        // Use Perplexity for deep search capabilities
+        const perplexityResponse = await callPerplexityAPI(
+          conversationHistory,
+          systemPrompt,
+          sessionType === 'voice' ? 150 : 300
+        );
+        aiResponse = perplexityResponse.choices[0]?.message?.content || undefined;
+
+        // Add citations if available
+        if (perplexityResponse.citations && perplexityResponse.citations.length > 0) {
+          const citations = perplexityResponse.citations
+            .slice(0, 3) // Limit to 3 citations
+            .map((citation: string, index: number) => `[${index + 1}] ${citation}`)
+            .join('\n');
+          aiResponse += `\n\n**Sources:**\n${citations}`;
+        }
+      } catch (perplexityError) {
+        console.error('Perplexity API failed, falling back to OpenAI:', perplexityError);
+        // Fallback to OpenAI if Perplexity fails
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4',
+          messages: [
+            { role: 'system', content: systemPrompt + '\n\nNote: Deep search is temporarily unavailable, providing response based on training data.' },
+            ...conversationHistory
+          ],
+          temperature: 0.7,
+          max_tokens: sessionType === 'voice' ? 150 : 300,
+        });
+        const fallbackResponse = completion.choices[0]?.message?.content;
+        aiResponse = fallbackResponse ? fallbackResponse + '\n\n*Note: Deep search temporarily unavailable - response based on existing knowledge.*' : undefined;
+      }
+    } else {
+      // Use OpenAI (default)
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...conversationHistory
+        ],
+        temperature: 0.7,
+        max_tokens: sessionType === 'voice' ? 150 : 300,
+      });
+      const openaiResponse = completion.choices[0]?.message?.content;
+      aiResponse = openaiResponse ?? undefined;
+    }
 
     if (!aiResponse) {
       throw new Error('No response generated from AI');
