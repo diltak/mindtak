@@ -81,7 +81,7 @@ export default function LoginPage() {
           // Redirect based on user role
           switch (userData.role) {
             case 'employee':
-              router.push('/employee/chat');
+              router.push('/employee/dashboard');
               break;
             case 'manager':
               router.push('/manager/dashboard');
@@ -94,7 +94,7 @@ export default function LoginPage() {
               router.push('/employer/analytics');
               break;
             default:
-              router.push('/employee/chat');
+              router.push('/employee/dashboard');
           }
         } else {
           setError('User profile not found. Please contact your administrator.');
@@ -129,22 +129,8 @@ export default function LoginPage() {
   };
 
   const handleDemoLogin = (role: string) => {
-    // For demo purposes, redirect without authentication
-    toast.info('Demo mode - No authentication required');
-    
-    switch (role) {
-      case 'employee':
-        router.push('/employee/chat');
-        break;
-      case 'manager':
-        router.push('/manager/dashboard');
-        break;
-      case 'employer':
-        router.push('/employer/dashboard');
-        break;
-      default:
-        router.push('/employee/chat');
-    }
+    // Demo login disabled - redirect to regular login
+    toast.info('Demo mode is not available. Please use regular login.');
   };
 
   return (
@@ -155,7 +141,7 @@ export default function LoginPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <Brain className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">Mind-DiLTak</span>
+              <span className="text-2xl font-bold text-gray-900">MindCare</span>
             </Link>
             <Link href="/">
               <Button variant="ghost" className="flex items-center space-x-2">
@@ -170,7 +156,7 @@ export default function LoginPage() {
       <div className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your Mind-DiLTak account</p>
+          <p className="text-gray-600">Sign in to your MindCare account</p>
         </div>
 
         <Card>
@@ -239,43 +225,7 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or try demo mode</span>
-                </div>
-              </div>
 
-              <div className="mt-6 grid grid-cols-1 gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => handleDemoLogin('employee')}
-                  disabled={loading}
-                  className="w-full"
-                >
-                  Demo as Employee
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleDemoLogin('manager')}
-                  disabled={loading}
-                  className="w-full"
-                >
-                  Demo as Manager
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleDemoLogin('employer')}
-                  disabled={loading}
-                  className="w-full"
-                >
-                  Demo as Employer
-                </Button>
-              </div>
-            </div>
 
             <div className="mt-6 text-center text-sm">
               <span className="text-gray-600">Don't have an account? </span>

@@ -21,7 +21,8 @@ export function Navbar({ user }: NavbarProps) {
   const pathname = usePathname();
 
   const handleSignOut = async () => {
-    const error = await signOut(auth).catch((err) => err); // Catch potential errors from signOut
+    // Firebase signout
+    const error = await signOut(auth).catch((err) => err);
     if (error) {
       toast.error('Failed to sign out');
     } else {
@@ -44,7 +45,7 @@ export function Navbar({ user }: NavbarProps) {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <Brain className="h-8 w-8 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900">Mind-DiLTak</span>
+            <span className="text-xl font-bold text-gray-900">MindCare</span>
           </Link>
 
           {/* Navigation Links */}
@@ -85,7 +86,7 @@ export function Navbar({ user }: NavbarProps) {
                 </>
               )}
               
-              {(user.role === 'manager' || (user.direct_reports && user.direct_reports.length > 0)) && (
+              {user.role === 'manager' && (
                 <>
                   <Link 
                     href="/manager/dashboard" 
@@ -135,12 +136,22 @@ export function Navbar({ user }: NavbarProps) {
                   <Link 
                     href="/employer/employees" 
                     className={`text-sm font-medium transition-colors ${
-                      pathname === '/employer/employees' 
+                      pathname.startsWith('/employer/employees') 
                         ? 'text-blue-600' 
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
                     Employees
+                  </Link>
+                  <Link 
+                    href="/employer/reports" 
+                    className={`text-sm font-medium transition-colors ${
+                      pathname.startsWith('/employer/reports') 
+                        ? 'text-blue-600' 
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Reports
                   </Link>
                   <Link 
                     href="/employer/analytics" 

@@ -16,7 +16,7 @@ export default function ContactPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <Brain className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">Mind-DiLTak</span>
+              <span className="text-2xl font-bold text-gray-900">WellnessHub</span>
             </Link>
             <div className="flex items-center space-x-4">
               <Link href="/">
@@ -38,7 +38,7 @@ export default function ContactPage() {
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             Ready to transform your workplace wellness? Our team is here to help you get started 
-            with Mind-DiLTak and answer any questions you may have.
+            with WellnessHub and answer any questions you may have.
           </p>
         </div>
 
@@ -237,7 +237,7 @@ export default function ContactPage() {
               Frequently Asked Questions
             </h2>
             <p className="text-lg text-gray-600">
-              Quick answers to common questions about Mind-DiLTak
+              Quick answers to common questions about WellnessHub
             </p>
           </div>
 
@@ -299,10 +299,10 @@ export default function ContactPage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <Brain className="h-8 w-8 text-blue-400" />
-              <span className="text-2xl font-bold">Mind-DiLTak</span>
+              <span className="text-2xl font-bold">WellnessHub</span>
             </div>
             <div className="text-gray-400 text-sm">
-              © 2025 Mind-DiLTak. All rights reserved.
+              © 2025 WellnessHub. All rights reserved.
             </div>
           </div>
         </div>

@@ -35,7 +35,7 @@ export function ProtectedRoute({
         // User doesn't have required role, redirect to appropriate dashboard
         switch (user.role) {
           case 'employee':
-            router.push('/employee/chat');
+            router.push('/employee/dashboard');
             break;
           case 'manager':
             router.push('/manager/dashboard');

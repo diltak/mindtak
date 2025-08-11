@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/sonner';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Mind-DiLTak - Employee Mental Health Platform',
+  title: 'WellnessHub - Employee Mental Health Platform',
   description: 'AI-powered employee mental health analytics and wellness tracking platform',
 };
 

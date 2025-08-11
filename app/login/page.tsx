@@ -95,7 +95,7 @@ export default function LoginPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <Brain className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">Mind-DiLTak</span>
+              <span className="text-2xl font-bold text-gray-900">WellnessHub</span>
             </Link>
             <Link href="/">
               <Button variant="ghost" className="flex items-center space-x-2">

@@ -45,6 +45,7 @@ import {
 import { toast } from 'sonner';
 
 import type { MentalHealthReport, User } from '@/types/index';
+import { demoUsers, demoReports } from '@/lib/demo-data';
 
 interface AnalyticsData {
   departmentStats: { [key: string]: { count: number; avgWellness: number; avgStress: number; avgMood: number; avgEnergy: number } };
@@ -90,50 +91,63 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [useDemoData, setUseDemoData] = useState(true);
 
   useEffect(() => {
-    if (!userLoading && !user) {
-      router.push('/');
-      return;
-    }
+    console.log('Analytics useEffect - userLoading:', userLoading, 'user:', user);
 
-    if (user?.role !== 'employer') {
-      toast.error('Access denied. Employer role required.');
-      router.push('/');
-      return;
-    }
+    if (!userLoading) {
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
 
-    if (user) {
+      // Allow access for employer, hr, admin, and manager roles
+      if (!['employer', 'hr', 'admin', 'manager'].includes(user.role)) {
+        router.push('/');
+        return;
+      }
+
+      console.log('User authorized, fetching analytics');
       fetchAnalytics();
     }
-  }, [user, userLoading, router, timeRange, selectedDepartment]);
+  }, [user, userLoading, timeRange, selectedDepartment, useDemoData, router]);
 
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
       const companyId = user?.company_id;
+
       if (!companyId) {
-        console.log('No company ID found');
+        console.log('No company ID found for user');
+        toast.error('Company information not found');
         setLoading(false);
         return;
       }
 
       console.log('Fetching analytics for company:', companyId);
 
-      // Fetch company employees
+      // Fetch company employees (including all roles for better analytics)
       const employeesRef = collection(db, 'users');
       const employeesQuery = query(
         employeesRef,
         where('company_id', '==', companyId),
-        where('role', '==', 'employee')
+        where('is_active', '==', true)
       );
-      const employeeSnapshot = await getDocs(employeesQuery);
-      const employees: User[] = employeeSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as User));
 
-      console.log('Found employees:', employees.length);
+      let employees: User[] = [];
+      try {
+        const employeeSnapshot = await getDocs(employeesQuery);
+        employees = employeeSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as User));
+        console.log('Found employees:', employees.length);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+        toast.error('Failed to fetch employee data');
+        employees = [];
+      }
 
       // Calculate date range
       const daysAgo = parseInt(timeRange);
@@ -147,11 +161,17 @@ export default function AnalyticsPage() {
         where('company_id', '==', companyId)
       );
 
-      const reportSnapshot = await getDocs(reportsQuery);
-      const allReportsRaw: MentalHealthReport[] = reportSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as MentalHealthReport));
+      let allReportsRaw: MentalHealthReport[] = [];
+      try {
+        const reportSnapshot = await getDocs(reportsQuery);
+        allReportsRaw = reportSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as MentalHealthReport));
+      } catch (error) {
+        console.log('Error fetching reports, using empty array:', error);
+        allReportsRaw = [];
+      }
 
       // Filter by date in JavaScript
       const allReports = allReportsRaw.filter(report =>
@@ -262,17 +282,146 @@ export default function AnalyticsPage() {
         }))
         .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
-      setAnalytics({
-        departmentStats,
-        trendData,
-        riskDistribution,
-        monthlyReports,
-        wellnessMetrics,
-      });
+      // If no data found and user wants demo data, use demo data
+      if (filteredReports.length === 0 && (employees.length === 0 || useDemoData)) {
+        console.log('Using demo data for analytics');
+
+        const demoEmployees = demoUsers.filter(u => u.company_id === 'demo-company');
+        const demoReportsData = demoReports.filter(r => r.company_id === 'demo-company');
+
+        // Calculate demo metrics
+        const demoWellnessMetrics = {
+          totalEmployees: demoEmployees.length,
+          totalReports: demoReportsData.length,
+          avgWellness: demoReportsData.length > 0
+            ? Math.round((demoReportsData.reduce((sum, r) => sum + r.overall_wellness, 0) / demoReportsData.length) * 10) / 10
+            : 0,
+          highRiskCount: demoReportsData.filter(r => r.risk_level === 'high').length,
+          mediumRiskCount: demoReportsData.filter(r => r.risk_level === 'medium').length,
+          lowRiskCount: demoReportsData.filter(r => r.risk_level === 'low').length,
+        };
+
+        // Calculate demo department stats
+        const demoDepartmentStats: { [key: string]: { count: number; avgWellness: number; avgStress: number; avgMood: number; avgEnergy: number } } = {};
+
+        demoEmployees.forEach(employee => {
+          const dept = employee.department || 'Unassigned';
+          const employeeReports = demoReportsData.filter(r => r.employee_id === employee.id);
+
+          if (!demoDepartmentStats[dept]) {
+            demoDepartmentStats[dept] = { count: 0, avgWellness: 0, avgStress: 0, avgMood: 0, avgEnergy: 0 };
+          }
+
+          demoDepartmentStats[dept].count++;
+
+          if (employeeReports.length > 0) {
+            demoDepartmentStats[dept].avgWellness = Math.round((employeeReports.reduce((sum, r) => sum + r.overall_wellness, 0) / employeeReports.length) * 10) / 10;
+            demoDepartmentStats[dept].avgStress = Math.round((employeeReports.reduce((sum, r) => sum + r.stress_level, 0) / employeeReports.length) * 10) / 10;
+            demoDepartmentStats[dept].avgMood = Math.round((employeeReports.reduce((sum, r) => sum + r.mood_rating, 0) / employeeReports.length) * 10) / 10;
+            demoDepartmentStats[dept].avgEnergy = Math.round((employeeReports.reduce((sum, r) => sum + r.energy_level, 0) / employeeReports.length) * 10) / 10;
+          }
+        });
+
+        // Generate demo trend data
+        const demoTrendData = [];
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          demoTrendData.push({
+            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            wellness: Math.round((6 + Math.random() * 2) * 10) / 10,
+            stress: Math.round((4 + Math.random() * 3) * 10) / 10,
+            mood: Math.round((6 + Math.random() * 2) * 10) / 10,
+            energy: Math.round((5 + Math.random() * 3) * 10) / 10,
+            reports: Math.floor(Math.random() * 3) + 1
+          });
+        }
+
+        // Demo risk distribution
+        const demoRiskDistribution = [
+          { name: 'Low Risk', value: demoWellnessMetrics.lowRiskCount, color: COLORS.success },
+          { name: 'Medium Risk', value: demoWellnessMetrics.mediumRiskCount, color: COLORS.warning },
+          { name: 'High Risk', value: demoWellnessMetrics.highRiskCount, color: COLORS.danger },
+        ].filter(item => item.value > 0);
+
+        setAnalytics({
+          departmentStats: demoDepartmentStats,
+          trendData: demoTrendData,
+          riskDistribution: demoRiskDistribution,
+          monthlyReports: [
+            { month: 'Nov 2024', reports: 8, avgWellness: 6.2 },
+            { month: 'Dec 2024', reports: 12, avgWellness: 6.8 },
+            { month: 'Jan 2025', reports: 15, avgWellness: 6.5 }
+          ],
+          wellnessMetrics: demoWellnessMetrics,
+        });
+
+        toast.info('Showing demo analytics data. Toggle off demo mode to see real data.');
+      } else if (filteredReports.length === 0 && employees.length > 0) {
+        console.log('No reports found, showing empty state with employee count');
+
+        // Generate basic stats with employee count but no reports
+        const basicWellnessMetrics = {
+          totalEmployees: employees.length,
+          totalReports: 0,
+          avgWellness: 0,
+          highRiskCount: 0,
+          mediumRiskCount: 0,
+          lowRiskCount: 0,
+        };
+
+        const basicDepartmentStats: { [key: string]: { count: number; avgWellness: number; avgStress: number; avgMood: number; avgEnergy: number } } = {};
+
+        employees.forEach(employee => {
+          const dept = employee.department || 'Unassigned';
+          if (!basicDepartmentStats[dept]) {
+            basicDepartmentStats[dept] = { count: 0, avgWellness: 0, avgStress: 0, avgMood: 0, avgEnergy: 0 };
+          }
+          basicDepartmentStats[dept].count++;
+        });
+
+        setAnalytics({
+          departmentStats: basicDepartmentStats,
+          trendData: [],
+          riskDistribution: [],
+          monthlyReports: [],
+          wellnessMetrics: basicWellnessMetrics,
+        });
+
+        toast.info('No wellness reports found. Encourage employees to submit their wellness reports to see analytics.');
+      } else {
+        setAnalytics({
+          departmentStats,
+          trendData,
+          riskDistribution,
+          monthlyReports,
+          wellnessMetrics,
+        });
+
+        if (filteredReports.length > 0) {
+          toast.success(`Analytics loaded with ${filteredReports.length} reports`);
+        }
+      }
 
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      toast.error('Failed to load analytics data');
+      toast.error('Failed to load analytics data. Please try again.');
+
+      // Set empty state on error
+      setAnalytics({
+        departmentStats: {},
+        trendData: [],
+        riskDistribution: [],
+        monthlyReports: [],
+        wellnessMetrics: {
+          totalEmployees: 0,
+          totalReports: 0,
+          avgWellness: 0,
+          highRiskCount: 0,
+          mediumRiskCount: 0,
+          lowRiskCount: 0,
+        }
+      });
     } finally {
       setLoading(false);
     }
@@ -328,10 +477,6 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar user={user || undefined} />
@@ -345,6 +490,14 @@ export default function AnalyticsPage() {
             </p>
           </div>
           <div className="flex items-center space-x-4 mt-4 sm:mt-0">
+            <Button
+              variant={useDemoData ? "default" : "outline"}
+              onClick={() => setUseDemoData(!useDemoData)}
+              className={useDemoData ? "bg-purple-600 hover:bg-purple-700" : ""}
+            >
+              <Brain className="h-4 w-4 mr-2" />
+              {useDemoData ? 'Demo Mode' : 'Use Demo'}
+            </Button>
             <Button variant="outline" onClick={fetchAnalytics}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
@@ -352,6 +505,10 @@ export default function AnalyticsPage() {
             <Button variant="outline" onClick={exportData}>
               <Download className="h-4 w-4 mr-2" />
               Export
+            </Button>
+            <Button onClick={() => router.push('/employer/reports/custom')}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Custom Report
             </Button>
           </div>
         </div>
@@ -401,6 +558,8 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
+
+
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -686,6 +845,29 @@ export default function AnalyticsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* No Data State */}
+        {analytics.wellnessMetrics.totalEmployees === 0 && (
+          <Card className="mt-8">
+            <CardContent className="p-12 text-center">
+              <Users className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Employee Data Found</h3>
+              <p className="text-gray-500 mb-6">
+                It looks like there are no active employees in your company yet.
+              </p>
+              <div className="space-y-2 text-sm text-gray-600 mb-6">
+                <p>To see analytics data:</p>
+                <p>• Add employees to your company</p>
+                <p>• Ensure employees have submitted wellness reports</p>
+                <p>• Check that your company ID is properly configured</p>
+              </div>
+              <Button onClick={() => router.push('/employer/employees')}>
+                <Users className="h-4 w-4 mr-2" />
+                Manage Employees
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">

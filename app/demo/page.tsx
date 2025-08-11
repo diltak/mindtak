@@ -117,7 +117,7 @@ export default function DemoPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <Brain className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">Mind-DiLTak</span>
+              <span className="text-2xl font-bold text-gray-900">WellnessHub</span>
             </Link>
             <div className="flex items-center space-x-4">
               <Link href="/login">
@@ -140,7 +140,7 @@ export default function DemoPage() {
             Interactive Demo
           </h1>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Explore all features of the Mind-DiLTak platform with sample data. 
+            Explore all features of the WellnessHub platform with sample data. 
             No registration required - jump right into any role or feature.
           </p>
         </div>
@@ -215,7 +215,7 @@ export default function DemoPage() {
                 <Brain className="h-12 w-12 mx-auto mb-4 text-blue-600" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Demo Information</h3>
                 <p className="text-gray-600">
-                  This interactive demo showcases the complete Mind-DiLTak platform with realistic sample data
+                  This interactive demo showcases the complete WellnessHub platform with realistic sample data
                 </p>
               </div>
               

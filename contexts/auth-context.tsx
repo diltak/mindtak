@@ -46,8 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
+      try {
+        if (firebaseUser) {
           // Get user data from Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
@@ -56,16 +56,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             // User exists in Auth but not in Firestore
             console.warn('User exists in Auth but not in Firestore');
+            await firebaseSignOut(auth); // Sign out if user data is missing
             setUser(null);
           }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
+        } else {
           setUser(null);
         }
-      } else {
+      } catch (error) {
+        console.error('Error in auth state change:', error);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-2 text-2xl font-bold text-gray-900">
             <Brain className="h-8 w-8 text-blue-600" />
-            <span>Mind-DiLTak</span>
+            <span>WellnessHub</span>
           </Link>
         </div>
 

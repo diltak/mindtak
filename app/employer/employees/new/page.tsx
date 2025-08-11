@@ -120,8 +120,16 @@ export default function NewEmployeePage() {
     setLoading(true);
     setError('');
 
-    if (!user || user.role !== 'employer' || !user.company_id) {
-      return router.push('/'); // Redirect if not authorized
+    if (!user || !user.company_id) {
+      setError('User information not available');
+      setLoading(false);
+      return;
+    }
+
+    if (!['employer', 'hr', 'admin', 'manager'].includes(user.role)) {
+      setError('You do not have permission to add employees');
+      setLoading(false);
+      return;
     }
 
     // Validation
@@ -189,7 +197,10 @@ export default function NewEmployeePage() {
         }
 
         toast.success('Employee added successfully with hierarchy setup!');
-        router.push('/employer/employees');
+        
+        // Redirect based on user role
+        const redirectPath = user.role === 'employer' ? '/employer/employees' : `/${user.role}/employees`;
+        router.push(redirectPath);
       } else {
         setError('Failed to create employee profile');
       }
@@ -214,12 +225,12 @@ export default function NewEmployeePage() {
     );
   }
 
-  if (user.role !== 'employer') {
+  if (!['employer', 'hr', 'admin', 'manager'].includes(user.role)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Only employers can add employees.</p>
-          <Link href="/employee/dashboard">
+          <p className="text-gray-600 mb-4">You do not have permission to add employees.</p>
+          <Link href={`/${user.role}/dashboard`}>
             <Button>Go to Dashboard</Button>
           </Link>
         </div>
@@ -234,7 +245,7 @@ export default function NewEmployeePage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/employer/employees" className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4">
+          <Link href={user.role === 'employer' ? '/employer/employees' : `/${user.role}/employees`} className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Employees
           </Link>
@@ -499,7 +510,7 @@ export default function NewEmployeePage() {
 
               {/* Submit Button */}
               <div className="flex justify-end space-x-4 pt-6 border-t">
-                <Link href="/employer/employees">
+                <Link href={user.role === 'employer' ? '/employer/employees' : `/${user.role}/employees`}>
                   <Button variant="outline" type="button">
                     Cancel
                   </Button>

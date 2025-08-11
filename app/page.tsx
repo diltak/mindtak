@@ -12,7 +12,7 @@ export default function HomePage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
               <Brain className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">Mind-DiLTak</span>
+              <span className="text-2xl font-bold text-gray-900">WellnessHub</span>
             </div>
             <div className="flex items-center space-x-4">
               <div className="hidden md:flex items-center space-x-2">
@@ -274,7 +274,7 @@ export default function HomePage() {
             Ready to Transform Your Workplace Wellness?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join thousands of organizations already using Mind-DiLTak to create healthier, 
+            Join thousands of organizations already using WellnessHub to create healthier, 
             more productive work environments.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -299,10 +299,10 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <Brain className="h-8 w-8 text-blue-400" />
-              <span className="text-2xl font-bold">Mind-DiLTak</span>
+              <span className="text-2xl font-bold">WellnessHub</span>
             </div>
             <div className="text-gray-400 text-sm">
-              © 2025 Mind-DiLTak. All rights reserved.
+              © 2025 WellnessHub. All rights reserved.
             </div>
           </div>
         </div>

@@ -11,6 +11,7 @@ export function useUser() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Use Firebase auth
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       setLoading(true);
       

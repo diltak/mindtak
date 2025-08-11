@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Track if migrations have been run in this instance
-let migrationsRun = false;
-let migrationPromise: Promise<void> | null = null;
-
 export async function middleware(request: NextRequest) {
-  // Only run migrations once per application instance
- 
+  const { pathname } = request.nextUrl;
+
+  // Skip middleware for all routes - let client-side auth handle protection
+  // This prevents redirect loops and allows proper authentication flow
   return NextResponse.next();
 }
 

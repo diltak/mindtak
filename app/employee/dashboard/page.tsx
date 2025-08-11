@@ -43,8 +43,22 @@ export default function EmployeeDashboard() {
       return;
     }
 
-    if (user?.role !== 'employee') {
-      // router.push('/employer/dashboard');
+    if (user && user.role !== 'employee') {
+      // Redirect non-employees to their appropriate dashboard
+      switch (user.role) {
+        case 'employer':
+          router.push('/employer/dashboard');
+          break;
+        case 'manager':
+          router.push('/manager/dashboard');
+          break;
+        case 'hr':
+        case 'admin':
+          router.push('/employer/analytics');
+          break;
+        default:
+          router.push('/');
+      }
       return;
     }
 

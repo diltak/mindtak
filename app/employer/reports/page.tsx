@@ -42,69 +42,159 @@ export default function EmployerReportsPage() {
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
 
+  const [stats, setStats] = useState({
+    totalReports: 0,
+    highRisk: 0,
+    mediumRisk: 0,
+    lowRisk: 0,
+    avgWellness: 0,
+    departments: [] as string[]
+  });
+
   useEffect(() => {
-    if (!userLoading && !user) {
-      router.push('/');
-      return;
-    }
+    if (!userLoading) {
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
 
-    if (user?.role !== 'employer') {
-      // router.push('/employee/dashboard');
-      return;
-    }
+      if (user.role !== 'employer' && user.role !== 'hr' && user.role !== 'admin') {
+        router.push('/');
+        return;
+      }
 
-    if (user) {
-      fetchReports();
+      if (user.company_id) {
+        fetchReports();
+      }
     }
   }, [user, userLoading, router]);
 
   const fetchReports = async () => {
+    if (!user?.company_id) return;
+
     try {
-      if (!user?.company_id) {
-        console.error('User or company ID not available');
-        setLoading(false);
-        return;
-      }
+      setLoading(true);
 
-      // Check user permissions
-      const permissions = getManagerPermissions(user);
-      
-      // Use hierarchy-aware filtering for reports
-      const filteredReports = await getHierarchyFilteredReports(user.id, user.company_id, 30);
-
-      // Fetch all company employees for display purposes
-      const employeesRef = collection(db, 'users');
-      const employeesQuery = query(employeesRef, 
-        where('company_id', '==', user.company_id),
-        where('is_active', '==', true)
+      // Fetch all company employees first
+      const employeesQuery = query(
+        collection(db, 'users'),
+        where('company_id', '==', user.company_id)
       );
       const employeesSnapshot = await getDocs(employeesQuery);
-      const employees = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as User[];
+      const employees = employeesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as User));
 
-      // Combine reports with employee data
-      const reportsWithEmployees: ReportWithEmployee[] = filteredReports.map(report => {
-        const employee = employees.find(emp => emp.id === report.employee_id);
+      // Create employee lookup map
+      const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
+
+      // Fetch all reports for the company
+      const reportsQuery = query(
+        collection(db, 'mental_health_reports'),
+        where('company_id', '==', user.company_id)
+      );
+      const reportsSnapshot = await getDocs(reportsQuery);
+      
+      const reportsData = reportsSnapshot.docs.map(doc => {
+        const reportData = { id: doc.id, ...doc.data() } as MentalHealthReport;
+        const employee = employeeMap.get(reportData.employee_id);
+        
         return {
-          ...report,
-          employee: employee ? {
-            ...employee,
-            // Show appropriate level of detail based on permissions
-            first_name: employee.first_name || 'Unknown',
-            last_name: employee.last_name || 'Employee',
-            email: permissions.can_view_team_reports 
-              ? employee.email || `employee-${employee.id?.slice(0, 8)}@company.com`
-              : 'Hidden for privacy',
-          } : undefined,
-        };
+          ...reportData,
+          employee
+        } as ReportWithEmployee;
       });
 
-      setReports(reportsWithEmployees);
+      // Sort reports by date (newest first)
+      const sortedReports = reportsData.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setReports(sortedReports);
+
+      // Calculate statistics
+      const totalReports = sortedReports.length;
+      const highRisk = sortedReports.filter(r => r.risk_level === 'high').length;
+      const mediumRisk = sortedReports.filter(r => r.risk_level === 'medium').length;
+      const lowRisk = sortedReports.filter(r => r.risk_level === 'low').length;
+      const avgWellness = totalReports > 0 
+        ? sortedReports.reduce((sum, r) => sum + (r.overall_wellness || 0), 0) / totalReports 
+        : 0;
+
+      // Get unique departments
+      const departments = Array.from(
+        new Set(employees.map(emp => emp.department).filter(Boolean))
+      ) as string[];
+
+      setStats({
+        totalReports,
+        highRisk,
+        mediumRisk,
+        lowRisk,
+        avgWellness: Math.round(avgWellness * 10) / 10,
+        departments
+      });
+
     } catch (error) {
       console.error('Error fetching reports:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Filter and sort reports
+  const filteredAndSortedReports = reports
+    .filter(report => {
+      // Search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const employeeName = report.employee 
+          ? `${report.employee.first_name} ${report.employee.last_name}`.toLowerCase()
+          : '';
+        const employeeEmail = report.employee?.email?.toLowerCase() || '';
+        const department = report.employee?.department?.toLowerCase() || '';
+        
+        if (!employeeName.includes(searchLower) && 
+            !employeeEmail.includes(searchLower) && 
+            !department.includes(searchLower)) {
+          return false;
+        }
+      }
+
+      // Risk filter
+      if (filterRisk !== 'all' && report.risk_level !== filterRisk) {
+        return false;
+      }
+
+      // Department filter
+      if (filterDepartment !== 'all' && report.employee?.department !== filterDepartment) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'wellness-high':
+          return (b.overall_wellness || 0) - (a.overall_wellness || 0);
+        case 'wellness-low':
+          return (a.overall_wellness || 0) - (b.overall_wellness || 0);
+        case 'risk-high':
+          const riskOrder = { high: 3, medium: 2, low: 1 };
+          return (riskOrder[b.risk_level] || 0) - (riskOrder[a.risk_level] || 0);
+        case 'employee':
+          const nameA = a.employee ? `${a.employee.first_name} ${a.employee.last_name}` : '';
+          const nameB = b.employee ? `${b.employee.first_name} ${b.employee.last_name}` : '';
+          return nameA.localeCompare(nameB);
+        default:
+          return 0;
+      }
+    });
 
   const getRiskLevelBadge = (riskLevel: 'low' | 'medium' | 'high') => {
     const colors = {
