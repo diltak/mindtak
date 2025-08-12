@@ -213,13 +213,14 @@ export default function NewEmployeePage() {
   };
 
   if (!user) {
+    // Show a loading spinner while user info is being fetched
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">Please sign in to add employees.</p>
-          <Link href="/">
-            <Button>Go Home</Button>
-          </Link>
+          <div className="flex justify-center mb-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+          </div>
+          <p className="text-gray-600 mb-4">Loading user information...</p>
         </div>
       </div>
     );
