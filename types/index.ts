@@ -129,11 +129,20 @@ export interface EmotionAnalysis {
 
 export interface DashboardStats {
   total_employees: number;
+  total_managers: number;
   active_sessions: number;
   completed_reports: number;
   average_wellness_score: number;
+  average_mood_score: number;
+  average_stress_score: number;
+  average_energy_score: number;
   high_risk_employees: number;
+  medium_risk_employees: number;
+  low_risk_employees: number;
   wellness_trend: 'improving' | 'stable' | 'declining';
+  department_stats: { [key: string]: any };
+  weekly_reports: number;
+  participation_rate: number;
   last_updated: string;
 }
 

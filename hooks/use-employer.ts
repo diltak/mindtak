@@ -155,11 +155,20 @@ export function useEmployer() {
 
       const stats: DashboardStats = {
         total_employees: employees.length,
+        total_managers: 0, // TODO: Calculate actual managers count
         active_sessions: activeSessionsSnapshot.size,
         completed_reports: recentReportsSnapshot.size,
         average_wellness_score: Math.round(averageWellnessScore * 10) / 10,
+        average_mood_score: 0, // TODO: Calculate actual mood score
+        average_stress_score: 0, // TODO: Calculate actual stress score
+        average_energy_score: 0, // TODO: Calculate actual energy score
         high_risk_employees: highRiskCount,
+        medium_risk_employees: 0, // TODO: Calculate actual medium risk count
+        low_risk_employees: 0, // TODO: Calculate actual low risk count
         wellness_trend: averageWellnessScore > 7 ? 'improving' : averageWellnessScore > 5 ? 'stable' : 'declining',
+        department_stats: {}, // TODO: Calculate actual department stats
+        weekly_reports: 0, // TODO: Calculate actual weekly reports
+        participation_rate: 0, // TODO: Calculate actual participation rate
         last_updated: new Date().toISOString()
       };
 

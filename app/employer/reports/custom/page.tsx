@@ -134,7 +134,7 @@ export default function CustomReportPage() {
       // Extract unique departments
       const uniqueDepartments = Array.from(
         new Set(employeesData.map(emp => emp.department).filter(Boolean))
-      );
+      ) as string[];
       setDepartments(uniqueDepartments);
     } catch (error) {
       console.error('Error loading employees:', error);
@@ -389,7 +389,7 @@ export default function CustomReportPage() {
   if (userLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar user={user} />
+        <Navbar user={user || undefined} />
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
         </div>

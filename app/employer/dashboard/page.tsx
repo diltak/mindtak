@@ -23,7 +23,7 @@ import {
   Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { DashboardStats, MentalHealthReport } from '@/types/index';
+import type { DashboardStats, MentalHealthReport, User } from '@/types/index';
 import {
   collection,
   query,
@@ -141,7 +141,7 @@ export default function EmployerDashboardPage() {
         where('company_id', '==', user.company_id)
       );
       const allUsersSnapshot = await getDocs(allUsersQuery);
-      const allUsers = allUsersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const allUsers = allUsersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as User[];
       
       // Filter employees
       const employees = allUsers.filter(u => u.role === 'employee');
@@ -163,7 +163,7 @@ export default function EmployerDashboardPage() {
         where('company_id', '==', user.company_id)
       );
       const reportsSnapshot = await getDocs(reportsQuery);
-      const allReports = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const allReports = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as MentalHealthReport[];
 
       // Filter reports by date ranges
       const now = new Date();
@@ -226,7 +226,7 @@ export default function EmployerDashboardPage() {
         ? previousWeekReports.reduce((sum, r) => sum + (r.overall_wellness || 0), 0) / previousWeekReports.length 
         : 0;
 
-      let wellnessTrend = 'stable';
+      let wellnessTrend: 'improving' | 'stable' | 'declining' = 'stable';
       if (currentWeekAvg > previousWeekAvg + 0.5) {
         wellnessTrend = 'improving';
       } else if (currentWeekAvg < previousWeekAvg - 0.5) {
@@ -234,7 +234,7 @@ export default function EmployerDashboardPage() {
       }
 
       // Calculate department breakdown
-      const departmentStats = {};
+      const departmentStats: { [key: string]: { employeeCount: number; reportCount: number; avgWellness: number; highRisk: number } } = {};
       employees.forEach(employee => {
         const dept = employee.department || 'Unassigned';
         if (!departmentStats[dept]) {
