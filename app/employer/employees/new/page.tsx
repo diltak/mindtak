@@ -30,7 +30,7 @@ export default function NewEmployeePage() {
   useEffect(() => {
     const fetchManagers = async () => {
       if (!user?.company_id) return;
-      
+
       try {
         const managersRef = collection(db, 'users');
         const managersQuery = query(
@@ -42,7 +42,7 @@ export default function NewEmployeePage() {
         const managersData = managersSnapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as User))
           .filter(u => u.role === 'manager' || u.role === 'hr' || u.role === 'admin' || u.role === 'employer');
-        
+
         setManagers(managersData);
       } catch (error) {
         console.error('Error fetching managers:', error);
@@ -94,11 +94,11 @@ export default function NewEmployeePage() {
   ];
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      [field]: field.startsWith('can') || field.startsWith('is') || field === 'skipLevelAccess' 
-        ? value === 'true' 
-        : value 
+    setFormData(prev => ({
+      ...prev,
+      [field]: field.startsWith('can') || field.startsWith('is') || field === 'skipLevelAccess'
+        ? value === 'true'
+        : value
     }));
   };
 
@@ -197,10 +197,11 @@ export default function NewEmployeePage() {
         }
 
         toast.success('Employee added successfully with hierarchy setup!');
-        
+
         // Redirect based on user role
-        const redirectPath = user.role === 'employer' ? '/employer/employees' : `/${user.role}/employees`;
-        router.push(redirectPath);
+        setTimeout(() => {
+          router.push('/employer/employees');
+        }, 2000)
       } else {
         setError('Failed to create employee profile');
       }
@@ -246,7 +247,7 @@ export default function NewEmployeePage() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <Link href={user.role === 'employer' ? '/employer/employees' : `/${user.role}/employees`} className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4">
+          <Link href="/employer/employees" className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Employees
           </Link>
@@ -403,7 +404,7 @@ export default function NewEmployeePage() {
                 {/* Permissions */}
                 <div className="space-y-4">
                   <h4 className="text-md font-medium text-gray-800">Permissions & Responsibilities</h4>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
@@ -511,11 +512,9 @@ export default function NewEmployeePage() {
 
               {/* Submit Button */}
               <div className="flex justify-end space-x-4 pt-6 border-t">
-                <Link href={user.role === 'employer' ? '/employer/employees' : `/${user.role}/employees`}>
                   <Button variant="outline" type="button">
                     Cancel
                   </Button>
-                </Link>
                 <Button type="submit" disabled={loading}>
                   {loading ? (
                     <>
