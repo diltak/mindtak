@@ -150,61 +150,48 @@ export default function NewEmployeePage() {
     }
 
     try {
-      // Create the user account
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-      const firebaseUser = userCredential.user;
+      // Determine role based on hierarchy level and permissions
+      let role = 'employee';
+      const hierarchyLevel = parseInt(formData.hierarchyLevel);
+      if (hierarchyLevel <= 2 || formData.canManageEmployees) {
+        role = 'manager';
+      }
 
-      if (firebaseUser) {
-        // Determine role based on hierarchy level and permissions
-        let role = 'employee';
-        const hierarchyLevel = parseInt(formData.hierarchyLevel);
-        if (hierarchyLevel <= 2 || formData.canManageEmployees) {
-          role = 'manager';
-        }
-
-        // Create user profile with hierarchy data
-        const userDocRef = doc(collection(db, 'users'), firebaseUser.uid);
-        await setDoc(userDocRef, {
-          id: firebaseUser.uid,
+      // Call our API route to create the user via Admin SDK
+      const res = await fetch('/api/createEmployee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
           role: role,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
           department: formData.department || '',
           position: formData.position || '',
           company_id: user.company_id,
-          manager_id: formData.managerId && formData.managerId !== 'none' ? formData.managerId : null,
-          hierarchy_level: hierarchyLevel,
-          is_department_head: formData.isDepartmentHead,
-          can_view_team_reports: formData.canViewTeamReports,
-          can_approve_leaves: formData.canApproveLeaves,
-          can_manage_employees: formData.canManageEmployees,
-          skip_level_access: formData.skipLevelAccess,
-          direct_reports: [],
-          reporting_chain: [],
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+          managerId: formData.managerId,
+          hierarchyLevel,
+          permissions: {
+            is_department_head: formData.isDepartmentHead,
+            can_view_team_reports: formData.canViewTeamReports,
+            can_approve_leaves: formData.canApproveLeaves,
+            can_manage_employees: formData.canManageEmployees,
+            skip_level_access: formData.skipLevelAccess,
+          }
+        })
+      });
 
-        // Update reporting chain if manager is assigned
-        if (formData.managerId && formData.managerId !== 'none') {
-          await updateReportingChain(firebaseUser.uid, formData.managerId);
-        }
-
-        toast.success('Employee added successfully with hierarchy setup!');
-
-        // Redirect based on user role
-        setTimeout(() => {
-          router.push('/employer/employees');
-        }, 2000)
-      } else {
-        setError('Failed to create employee profile');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create employee');
       }
+
+      toast.success('Employee added successfully with hierarchy setup!');
+
+      setTimeout(() => {
+        router.push('/employer/employees');
+      }, 2000);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
       console.error('Error:', err);
@@ -512,9 +499,9 @@ export default function NewEmployeePage() {
 
               {/* Submit Button */}
               <div className="flex justify-end space-x-4 pt-6 border-t">
-                  <Button variant="outline" type="button">
-                    Cancel
-                  </Button>
+                <Button variant="outline" type="button">
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={loading}>
                   {loading ? (
                     <>
