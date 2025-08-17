@@ -444,7 +444,7 @@ export default function NewEmployeePage() {
                     <div className="flex items-center justify-between md:col-span-2">
                       <div className="space-y-0.5">
                         <Label htmlFor="skipLevelAccess">Skip-Level Access</Label>
-                        <p className="text-sm text-gray-500">Can view reports of subordinates' teams</p>
+                        <p className="text-sm text-gray-500">Can view reports of subordinates teams</p>
                       </div>
                       <Switch
                         id="skipLevelAccess"
@@ -528,7 +528,7 @@ export default function NewEmployeePage() {
               <li>• The employee will receive login credentials via email</li>
               <li>• They can change their password after first login</li>
               <li>• All wellness data will be encrypted and secure</li>
-              <li>• You'll only see anonymized aggregate data for privacy</li>
+              <li>• You&apos;ll only see anonymized aggregate data for privacy</li>
               <li>• Employees can update their profile information anytime</li>
             </ul>
           </CardContent>
