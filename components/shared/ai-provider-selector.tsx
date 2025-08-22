@@ -23,7 +23,7 @@ export function DeepConversationToggle({
 }: DeepConversationToggleProps) {
   return (
     <TooltipProvider>
-      <div className="flex items-center justify-between space-x-3 p-3 bg-gray-50 rounded-lg border">
+      <div className="flex items-center justify-between space-x-3 p-3 bg-gray-50 rounded-lg border w-full">
         <div className="flex items-center space-x-2">
           <Search className="h-4 w-4 text-blue-600" />
           <Label htmlFor="deep-conversation" className="text-sm font-medium cursor-pointer">
