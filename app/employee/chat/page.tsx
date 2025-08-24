@@ -184,7 +184,7 @@ export default function EmployeeChatPage() {
   const [audioEnabled, setAudioEnabled] = useState(true);
 
   // Deep Conversation state
-  const [deepConversation, setDeepConversation] = useState(false);
+  const [deepConversation, setDeepConversation] = useState(true);
 
   const [processingAudio, setProcessingAudio] = useState(false);
 
@@ -896,7 +896,7 @@ How have you been feeling lately?`;
             </CardHeader>
 
             {/* Deep Conversation Toggle */}
-            {!sessionEnded && (
+            {!sessionEnded && false && (
               <div className="px-2 sm:px-4 py-2 border-b bg-gray-50/50 sm:flex sm:justify-between sm:items-center">
                 <DeepConversationToggle
                   deepConversation={deepConversation}
@@ -950,7 +950,7 @@ How have you been feeling lately?`;
                           <div className="prose prose-sm max-w-none">
                             <ReactMarkdown>{message.content}</ReactMarkdown>
                           </div>
-                          {deepConversation && (
+                          {deepConversation && false && (
                             <div className="flex items-center justify-end mt-2 pt-2 border-t border-gray-100">
                               <div className="flex items-center space-x-1 text-xs text-blue-600">
                                 <Search className="h-3 w-3" />
