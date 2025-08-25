@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import type { User } from '@/types/index';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
@@ -48,24 +48,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          // Get user data from Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            const userData = { id: userDoc.id, ...userDoc.data() } as User;
-            setUser(userData);
-          } else {
-            // User exists in Auth but not in Firestore
-            console.warn('User exists in Auth but not in Firestore');
-            await firebaseSignOut(auth); // Sign out if user data is missing
-            setUser(null);
-          }
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const unsubscribeSnapshot = onSnapshot(userDocRef, (doc) => {
+            if (doc.exists()) {
+              const userData = { id: doc.id, ...doc.data() } as User;
+              setUser(userData);
+            } else {
+              console.warn('User exists in Auth but not in Firestore');
+              toast.error('Your user data could not be found. Please contact support.');
+              firebaseSignOut(auth);
+              setUser(null);
+            }
+            setLoading(false);
+          }, (error) => {
+            console.error('Error in user snapshot listener:', error);
+            toast.error('There was an error fetching your user data.');
+            setLoading(false);
+          });
+          return () => unsubscribeSnapshot();
         } else {
           setUser(null);
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error in auth state change:', error);
         setUser(null);
-      } finally {
         setLoading(false);
       }
     });

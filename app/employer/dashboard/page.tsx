@@ -34,8 +34,9 @@ import {
   limit
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { withAuth } from '@/components/auth/with-auth';
 
-export default function EmployerDashboardPage() {
+function EmployerDashboardPage() {
   const { user, loading: userLoading } = useUser();
   const router = useRouter();
 
@@ -57,25 +58,10 @@ export default function EmployerDashboardPage() {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
 
   useEffect(() => {
-    if (!userLoading) {
-      if (!user) {
-        router.push('/auth/login');
-        return;
-      }
-
-      const allowedRoles = ['employer', 'admin', 'hr'];
-
-      if (!allowedRoles.includes(user.role)) {
-        toast.error('Access denied. Employer role required.');
-        router.push('/');
-        return;
-      }
-
-      if (user.company_id) {
+    if (!userLoading && user && user.company_id) {
         initializeDashboard();
-      }
     }
-  }, [user, userLoading, router]);
+  }, [user, userLoading]);
 
   const initializeDashboard = async () => {
     if (!user?.company_id) {
@@ -380,10 +366,6 @@ export default function EmployerDashboardPage() {
         <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
       </div>
     );
-  }
-
-  if (!user || user.role !== 'employer') {
-    return null;
   }
 
   return (
@@ -740,3 +722,5 @@ export default function EmployerDashboardPage() {
     </div>
   );
 }
+
+export default withAuth(EmployerDashboardPage, ['employer', 'admin', 'hr']);

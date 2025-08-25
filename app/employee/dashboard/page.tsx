@@ -23,8 +23,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { MentalHealthReport } from '@/types';
 import { auth, db } from '@/lib/firebase';
+import { withAuth } from '@/components/auth/with-auth';
 
-export default function EmployeeDashboard() {
+function EmployeeDashboard() {
   const { user, loading: userLoading } = useUser();
   const [reports, setReports] = useState<MentalHealthReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,34 +39,10 @@ export default function EmployeeDashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!userLoading && !user) {
-      router.push('/');
-      return;
-    }
-
-    if (user && user.role !== 'employee') {
-      // Redirect non-employees to their appropriate dashboard
-      switch (user.role) {
-        case 'employer':
-          router.push('/employer/dashboard');
-          break;
-        case 'manager':
-          router.push('/manager/dashboard');
-          break;
-        case 'hr':
-        case 'admin':
-          router.push('/employer/analytics');
-          break;
-        default:
-          router.push('/');
-      }
-      return;
-    }
-
     if (user) {
       fetchReports();
     }
-  }, [user, userLoading, router]);
+  }, [user]);
 
   const fetchReports = async () => {
     try {
@@ -75,7 +52,7 @@ export default function EmployeeDashboard() {
         return;
       }
 
-      console.log('Fetching reports for user:', user.id);
+      
 
       // Fetch reports from Firestore where employee_id matches current user's ID
       const reportsRef = collection(db, 'mental_health_reports');
@@ -437,3 +414,5 @@ export default function EmployeeDashboard() {
     </div>
   );
 }
+
+export default withAuth(EmployeeDashboard, ['employee']);

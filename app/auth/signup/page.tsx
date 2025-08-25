@@ -20,9 +20,7 @@ import {
   EyeOff,
   Loader2
 } from 'lucide-react';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+
 import { toast } from 'sonner';
 
 export default function SignUpPage() {
@@ -36,7 +34,7 @@ export default function SignUpPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'employer', // Fixed to employer only
+    role: 'employer',
     companyName: '',
     companySize: '',
     industry: ''
@@ -52,96 +50,39 @@ export default function SignUpPage() {
     setLoading(true);
     setError('');
 
-    // Validation
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.companyName) {
-      setError('Please fill in all required fields');
-      setLoading(false);
-      return;
-    }
-
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      setLoading(false);
-      return;
-    }
-
-    if (!formData.email.includes('@')) {
-      setError('Please enter a valid email address');
-      setLoading(false);
-      return;
-    }
-
     try {
-      // Create user account
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
 
-      if (userCredential.user) {
-        // Generate unique company ID
-        const companyId = `company_${userCredential.user.uid}`;
-        
-        // Create company document
-        await setDoc(doc(db, 'companies', companyId), {
-          id: companyId,
-          name: formData.companyName,
-          size: formData.companySize || 'Not specified',
-          industry: formData.industry || 'Not specified',
-          owner_id: userCredential.user.uid,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+      const data = await response.json();
 
-        // Create employer user profile in Firestore
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          id: userCredential.user.uid,
-          email: formData.email,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          role: 'employer',
-          company_id: companyId,
-          company_name: formData.companyName,
-          company_size: formData.companySize || 'Not specified',
-          industry: formData.industry || 'Not specified',
-          is_active: true,
-          hierarchy_level: 0, // CEO/Owner level
-          can_view_team_reports: true,
-          can_manage_employees: true,
-          can_approve_leaves: true,
-          is_department_head: true,
-          skip_level_access: true,
-          direct_reports: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-        toast.success('Company account created successfully!');
-        router.push('/employer/dashboard');
+      if (!response.ok) {
+        if (data.error) {
+            const errorMessages = Object.values(data.error).flat().join(', ');
+            setError(errorMessages);
+        } else {
+            setError(data.message || 'An unknown error occurred.');
+        }
+        return;
       }
+
+      toast.success(data.message);
+      router.push('/employer/dashboard');
+
     } catch (error: any) {
       console.error('Signup error:', error);
-      
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          setError('An account with this email already exists.');
-          break;
-        case 'auth/invalid-email':
-          setError('Invalid email address format.');
-          break;
-        case 'auth/weak-password':
-          setError('Password is too weak. Please choose a stronger password.');
-          break;
-        default:
-          setError('Failed to create account. Please try again.');
-      }
+      setError('Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -280,6 +221,18 @@ export default function SignUpPage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="role">Your Role</Label>
+                <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employer">Employer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="password">Password *</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -306,15 +259,26 @@ export default function SignUpPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                  disabled={loading}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Confirm your password"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                    className="pr-10"
+                    disabled={loading}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>

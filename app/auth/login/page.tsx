@@ -17,13 +17,10 @@ import {
   EyeOff,
   Loader2
 } from 'lucide-react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-import { toast } from 'sonner';
-import type { User } from '@/types/index';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function LoginPage() {
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +29,29 @@ export default function LoginPage() {
     email: '',
     password: ''
   });
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      // Redirect based on user role
+      switch (user.role) {
+        case 'employee':
+          router.push('/employee/dashboard');
+          break;
+        case 'manager':
+          router.push('/manager/dashboard');
+          break;
+        case 'employer':
+          router.push('/employer/dashboard');
+          break;
+        case 'hr':
+        case 'admin':
+          router.push('/employer/analytics');
+          break;
+        default:
+          router.push('/employee/dashboard');
+      }
+    }
+  }, [user, authLoading, router]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -43,86 +63,29 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    // Validation
-    if (!formData.email || !formData.password) {
-      setError('Please fill in all fields');
-      setLoading(false);
-      return;
-    }
-
-    if (!formData.email.includes('@')) {
-      setError('Please enter a valid email address');
-      setLoading(false);
-      return;
-    }
-
     try {
-      // Sign in with Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
 
-      if (userCredential.user) {
-        // Get user data from Firestore
-        const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-        
-        if (userDoc.exists()) {
-          const userData = { id: userDoc.id, ...userDoc.data() } as User;
-          
-          // Update last login
-          // await updateDoc(doc(db, 'users', userCredential.user.uid), {
-          //   last_login: new Date().toISOString()
-          // });
+      const data = await response.json();
 
-          toast.success(`Welcome back, ${userData.first_name}!`);
-
-          // Redirect based on user role
-          switch (userData.role) {
-            case 'employee':
-              router.push('/employee/dashboard');
-              break;
-            case 'manager':
-              router.push('/manager/dashboard');
-              break;
-            case 'employer':
-              router.push('/employer/dashboard');
-              break;
-            case 'hr':
-            case 'admin':
-              router.push('/employer/analytics');
-              break;
-            default:
-              router.push('/employee/dashboard');
-          }
-        } else {
-          setError('User profile not found. Please contact your administrator.');
-        }
+      if (!response.ok) {
+        setError(data.error || 'An unknown error occurred.');
+        return;
       }
+
+      // The server has set the session cookie. Now we need to get the user data
+      // from the auth context, which will be updated automatically.
+      // We just need to wait for the loading state to be false.
+      
     } catch (error: any) {
       console.error('Login error:', error);
-      
-      // Handle specific Firebase auth errors
-      switch (error.code) {
-        case 'auth/user-not-found':
-          setError('No account found with this email address.');
-          break;
-        case 'auth/wrong-password':
-          setError('Incorrect password. Please try again.');
-          break;
-        case 'auth/invalid-email':
-          setError('Invalid email address format.');
-          break;
-        case 'auth/user-disabled':
-          setError('This account has been disabled. Please contact support.');
-          break;
-        case 'auth/too-many-requests':
-          setError('Too many failed attempts. Please try again later.');
-          break;
-        default:
-          setError('Login failed. Please check your credentials and try again.');
-      }
+      setError('Login failed. Please check your credentials and try again.');
     } finally {
       setLoading(false);
     }
