@@ -6,24 +6,18 @@ if (!admin.apps.length) {
     // Use the same project ID as the client config
     const projectId = process.env.FIREBASE_PROJECT_ID || "mindtest-94298";
     
-    // Check if we have service account credentials
-    if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: projectId,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-        }),
-      });
-    } else {
-      // Fallback to default credentials (for development)
-      console.log('Using default Firebase Admin credentials');
-      admin.initializeApp({
-        projectId: projectId,
-      });
-    }
+    console.log('Initializing Firebase Admin with project ID:', projectId);
+    
+    // For development, use a simpler approach without service account
+    // This will work for basic operations but may have limitations
+    admin.initializeApp({
+      projectId: projectId,
+    });
+    
+    console.log('Firebase Admin initialized successfully');
   } catch (error: any) {
     console.error('Firebase initialization error:', error);
+    // If initialization fails, we'll handle it gracefully
   }
 }
 

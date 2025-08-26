@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,9 @@ import {
   Loader2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { toast } from 'sonner';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 export default function LoginPage() {
   const { user, loading: authLoading } = useAuth();
@@ -64,28 +67,35 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'An unknown error occurred.');
-        return;
-      }
-
-      // The server has set the session cookie. Now we need to get the user data
-      // from the auth context, which will be updated automatically.
-      // We just need to wait for the loading state to be false.
+      // Use Firebase Auth directly
+      const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+      
+      toast.success('Login successful!');
+      
+      // The auth context will automatically update with the user data
+      // and redirect based on the user's role
       
     } catch (error: any) {
       console.error('Login error:', error);
-      setError('Login failed. Please check your credentials and try again.');
+      
+      // Handle specific Firebase Auth errors
+      switch (error.code) {
+        case 'auth/user-not-found':
+          setError('No account found with this email address.');
+          break;
+        case 'auth/wrong-password':
+          setError('Incorrect password.');
+          break;
+        case 'auth/invalid-email':
+          setError('Invalid email address.');
+          break;
+        case 'auth/too-many-requests':
+          setError('Too many failed attempts. Please try again later.');
+          break;
+        default:
+          setError('Login failed. Please check your credentials and try again.');
+      }
     } finally {
       setLoading(false);
     }

@@ -97,6 +97,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!manager) {
+      setLoading(false);
+      return;
+    }
+
     const fetchManagerData = async () => {
       try {
         setLoading(true);
@@ -130,7 +135,21 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
     };
 
     fetchManagerData();
-  }, [manager.id]);
+  }, [manager?.id]);
+
+  // Handle case when manager is null
+  if (!manager) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Manager Not Found</h3>
+          <p className="text-gray-600">
+            Unable to load manager dashboard. Please check your permissions.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -153,10 +172,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {manager.first_name}'s Team Dashboard
+            {manager.first_name}&apos;s Team Dashboard
           </h1>
           <p className="text-gray-600 mt-1">
-            Manage and monitor your team's wellness and performance
+            Manage and monitor your team&apos;s wellness and performance
           </p>
         </div>
         
@@ -307,7 +326,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Direct Reports</h3>
               <p className="text-gray-600">
-                You don't have any direct reports assigned yet.
+                You don&apos;t have any direct reports assigned yet.
               </p>
             </div>
           )}

@@ -22,6 +22,9 @@ import {
 } from 'lucide-react';
 
 import { toast } from 'sonner';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -57,32 +60,72 @@ export default function SignUpPage() {
     }
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+      // Create user with Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        formData.email, 
+        formData.password
+      );
+      
+      const user = userCredential.user;
+
+      // Generate unique company ID
+      const companyId = `company_${user.uid}`;
+
+      // Create company document in Firestore
+      const companyRef = doc(db, 'companies', companyId);
+      await setDoc(companyRef, {
+        id: companyId,
+        name: formData.companyName,
+        size: formData.companySize || 'Not specified',
+        industry: formData.industry || 'Not specified',
+        owner_id: user.uid,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
       });
 
-      const data = await response.json();
+      // Create employer user profile in Firestore
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
+        id: user.uid,
+        email: formData.email,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        role: 'employer',
+        company_id: companyId,
+        company_name: formData.companyName,
+        is_active: true,
+        hierarchy_level: 0,
+        can_view_team_reports: true,
+        can_manage_employees: true,
+        can_approve_leaves: true,
+        is_department_head: true,
+        skip_level_access: true,
+        direct_reports: [],
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      });
 
-      if (!response.ok) {
-        if (data.error) {
-            const errorMessages = Object.values(data.error).flat().join(', ');
-            setError(errorMessages);
-        } else {
-            setError(data.message || 'An unknown error occurred.');
-        }
-        return;
-      }
-
-      toast.success(data.message);
+      toast.success('Account created successfully!');
       router.push('/employer/dashboard');
 
     } catch (error: any) {
       console.error('Signup error:', error);
-      setError('Failed to create account. Please try again.');
+      
+      // Handle specific Firebase Auth errors
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          setError('An account with this email already exists.');
+          break;
+        case 'auth/invalid-email':
+          setError('Invalid email address.');
+          break;
+        case 'auth/weak-password':
+          setError('Password is too weak. Please choose a stronger password.');
+          break;
+        default:
+          setError('Failed to create account. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

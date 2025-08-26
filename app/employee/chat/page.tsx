@@ -907,7 +907,20 @@ How have you been feeling lately?`;
             )}
 
             {/* Chat Messages */}
-            <CardContent className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-4 bg-gray-50/50">
+            <CardContent className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-4 bg-gray-50/50 min-h-[400px] max-h-[600px]">
+              {messages.length === 0 && !loading && (
+                <div className="flex items-center justify-center h-full min-h-[300px]">
+                  <div className="text-center">
+                    <Bot className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Welcome to Wellness Chat</h3>
+                    <p className="text-gray-600 text-sm max-w-md">
+                      Start a conversation with your AI wellness assistant. Share how you&apos;re feeling, 
+                      discuss your day, or ask for support. Your conversation is confidential.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -1264,7 +1277,7 @@ How have you been feeling lately?`;
                       automatic
                     </p>
                     <p className="text-white/50 text-xs mt-2">
-                      End the call when you're ready to receive your wellness
+                      End the call when you&apos;re ready to receive your wellness
                       report
                     </p>
                   </div>
@@ -1306,7 +1319,7 @@ How have you been feeling lately?`;
 
               {!sessionEnded && !isVoiceMode && (
                 <p className="text-xs text-gray-500 mt-2">
-                  Press Enter to send. When you're ready, end the session to get
+                  Press Enter to send. When you&apos;re ready, end the session to get
                   your report.
                 </p>
               )}

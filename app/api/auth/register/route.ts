@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { auth, db } from '@/lib/firebase-admin';
+import { adminAuth, adminDB } from '@/lib/firebase-admin';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const registerSchema = z.object({
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const { firstName, lastName, email, password, companyName, companySize, industry } = validation.data;
 
     // Create user in Firebase Auth
-    const userRecord = await auth.createUser({
+    const userRecord = await adminAuth.createUser({
       email,
       password,
       displayName: `${firstName} ${lastName}`,
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const companyId = `company_${userRecord.uid}`;
 
     // Create company document in Firestore
-    const companyRef = doc(db, 'companies', companyId);
+    const companyRef = doc(adminDB, 'companies', companyId);
     await setDoc(companyRef, {
       id: companyId,
       name: companyName,
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     });
 
     // Create employer user profile in Firestore
-    const userRef = doc(db, 'users', userRecord.uid);
+    const userRef = doc(adminDB, 'users', userRecord.uid);
     await setDoc(userRef, {
       id: userRecord.uid,
       email,

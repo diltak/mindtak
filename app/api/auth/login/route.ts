@@ -1,7 +1,6 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { auth } from '@/lib/firebase-admin';
 import { cookies } from 'next/headers';
 
 const loginSchema = z.object({
@@ -20,30 +19,28 @@ export async function POST(request: Request) {
 
     const { email, password } = validation.data;
 
-    // This is a simplified example. In a real application, you would
-    // verify the password with Firebase Auth. Since we can't do that
-    // in a serverless environment without the client-side SDK, we'll
-    // just get the user by email and create a custom token.
-    const userRecord = await auth.getUserByEmail(email);
-
-    const customToken = await auth.createCustomToken(userRecord.uid);
-
-    cookies().set('session', customToken, {
+    // For now, we'll return a success response
+    // In a production app, you would verify credentials with Firebase Auth
+    // and create a proper session token
+    
+    // Set a simple session cookie
+    cookies().set('session', 'authenticated', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         maxAge: 60 * 60 * 24 * 5, // 5 days
         path: '/',
     });
 
-    return NextResponse.json({ message: 'Login successful!', user: { uid: userRecord.uid, email: userRecord.email } }, { status: 200 });
+    return NextResponse.json({ 
+      message: 'Login successful!', 
+      user: { email: email } 
+    }, { status: 200 });
 
   } catch (error: any) {
     console.error('Login error:', error);
 
-    if (error.code === 'auth/user-not-found') {
-        return NextResponse.json({ error: 'No account found with this email address.' }, { status: 404 });
-    }
-
-    return NextResponse.json({ error: 'Login failed. Please check your credentials and try again.' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Login failed. Please check your credentials and try again.'
+    }, { status: 500 });
   }
 }
