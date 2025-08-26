@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Brain, LogOut, Settings, User, ChevronDown } from 'lucide-react';
+import { Brain, LogOut, Settings, User as UserIcon, ChevronDown } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
@@ -194,7 +194,7 @@ export function Navbar({ user }: NavbarProps) {
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
+                  <UserIcon className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
@@ -220,7 +220,7 @@ export function Navbar({ user }: NavbarProps) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
                     <Link href="/auth/login" className="flex items-center">
-                      <User className="mr-2 h-4 w-4" />
+                      <UserIcon className="mr-2 h-4 w-4" />
                       <span>Sign In</span>
                     </Link>
                   </DropdownMenuItem>

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminAuth, adminDB } from '@/lib/firebase-admin';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 
 const registerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -36,20 +36,20 @@ export async function POST(request: Request) {
     const companyId = `company_${userRecord.uid}`;
 
     // Create company document in Firestore
-    const companyRef = doc(adminDB, 'companies', companyId);
-    await setDoc(companyRef, {
+    const companyRef = adminDB.collection('companies').doc(companyId);
+    await companyRef.set({
       id: companyId,
       name: companyName,
       size: companySize || 'Not specified',
       industry: industry || 'Not specified',
       owner_id: userRecord.uid,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
     });
 
     // Create employer user profile in Firestore
-    const userRef = doc(adminDB, 'users', userRecord.uid);
-    await setDoc(userRef, {
+    const userRef = adminDB.collection('users').doc(userRecord.uid);
+    await userRef.set({
       id: userRecord.uid,
       email,
       first_name: firstName,
@@ -65,8 +65,8 @@ export async function POST(request: Request) {
       is_department_head: true,
       skip_level_access: true,
       direct_reports: [],
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({ message: 'Company account created successfully!', userId: userRecord.uid }, { status: 201 });

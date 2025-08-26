@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Brain, Building, Mail, User, Phone, MapPin, Eye, EyeOff, Shield } from 'lucide-react';
+import { Brain, Building, Mail, User as UserIcon, Phone, MapPin, Eye, EyeOff, Shield } from 'lucide-react';
 import { auth, db } from '@/lib/firebase'; // Import Firebase auth and db
 import { collection, doc, addDoc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -256,7 +256,7 @@ export default function EmployerRegisterPage() {
               {/* Personal Information */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 flex items-center space-x-2">
-                  <User className="h-5 w-5" />
+                  <UserIcon className="h-5 w-5" />
                   <span>Personal Information</span>
                 </h3>
                 

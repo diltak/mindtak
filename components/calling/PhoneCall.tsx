@@ -17,7 +17,7 @@ import {
   MoreVertical,
   MessageSquare,
   Clock,
-  User,
+  User as UserIcon,
   Users
 } from 'lucide-react';
 import { toast } from 'sonner';

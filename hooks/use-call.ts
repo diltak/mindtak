@@ -141,7 +141,7 @@ export function useCall() {
             {
               id: user?.id || '',
               name: user?.first_name + ' ' + user?.last_name,
-              avatar: user?.avatar,
+              avatar: user?.avatar_url,
               role: 'caller',
               isOnline: true,
               isMuted: false,
